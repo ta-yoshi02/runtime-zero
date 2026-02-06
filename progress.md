@@ -33,3 +33,7 @@ Original prompt: Vite + Phaser で 2D横スクロールアクション「Runtime
 - さらにクリック遷移ボタン（Stage Select / Retry / Main Menu）をResult下部に追加し、キーボード非依存でも復帰可能にした。
 - 最終フォールバック追加: Result画面で Phaser input が完全停止しても遷移できるよう、`#app` 直下に DOM ボタン（Stage Select/Retry/Main Menu）をマウント。
 - さらに12秒で Stage Select へ自動遷移するタイムアウトを追加し、Resultでの詰みを防止。
+- Result遷移を `transitionTo()` に一本化し、`scene.start()` 後300msで target scene が active でない場合は `Title` へ自動復旧する watchdog を追加。
+- 目的: Resultからの遷移時に次シーン起動失敗でフリーズフレームが残るケースを自動回復。
+- 追加修正: Result shutdown 時に watchdog を消してしまい、遷移失敗時の回復が走らない不具合を修正。
+- watchdog判定を `isActive && isVisible && !isSleeping` に強化し、未起動時は Title へ確実復帰するようにした。

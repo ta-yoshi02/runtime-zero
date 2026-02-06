@@ -3,6 +3,7 @@ import { clearRenderGameToText, setRenderGameToText } from '../core/browserHooks
 import { SCENE_KEYS } from '../core/sceneKeys'
 import { sessionStore } from '../core/sessionStore'
 import { GameInput } from '../systems/input'
+import type { FlowState } from '../types'
 
 export class ResultScene extends Phaser.Scene {
   private inputMap!: GameInput
@@ -15,6 +16,7 @@ export class ResultScene extends Phaser.Scene {
   private transitioning = false
   private domFallbackContainer: HTMLDivElement | null = null
   private autoAdvanceTimer: number | null = null
+  private transitionWatchdogTimer: number | null = null
 
   constructor() {
     super(SCENE_KEYS.RESULT)
@@ -137,6 +139,12 @@ export class ResultScene extends Phaser.Scene {
         window.clearTimeout(this.autoAdvanceTimer)
       }
       this.autoAdvanceTimer = null
+      if (!this.transitioning && this.transitionWatchdogTimer !== null) {
+        window.clearTimeout(this.transitionWatchdogTimer)
+      }
+      if (!this.transitioning) {
+        this.transitionWatchdogTimer = null
+      }
       this.unmountDomFallbackControls()
       clearRenderGameToText()
     })
@@ -273,32 +281,42 @@ export class ResultScene extends Phaser.Scene {
   }
 
   private goStageSelect(): void {
-    if (this.transitioning) {
-      return
-    }
-
-    this.transitioning = true
-    sessionStore.setFlow('stage_select')
-    this.scene.start(SCENE_KEYS.STAGE_SELECT)
+    this.transitionTo(SCENE_KEYS.STAGE_SELECT, 'stage_select')
   }
 
   private goRetry(): void {
-    if (this.transitioning) {
-      return
-    }
-
-    this.transitioning = true
-    sessionStore.setFlow('ingame')
-    this.scene.start(SCENE_KEYS.STAGE_PLAY)
+    this.transitionTo(SCENE_KEYS.STAGE_PLAY, 'ingame')
   }
 
   private goMainMenu(): void {
+    this.transitionTo(SCENE_KEYS.MAIN_MENU, 'main_menu')
+  }
+
+  private transitionTo(targetScene: string, nextFlow: FlowState): void {
     if (this.transitioning) {
       return
     }
 
     this.transitioning = true
-    sessionStore.setFlow('main_menu')
-    this.scene.start(SCENE_KEYS.MAIN_MENU)
+    sessionStore.setFlow(nextFlow)
+    this.scene.start(targetScene)
+
+    // If target scene fails to boot for any reason, recover to Title.
+    this.transitionWatchdogTimer = window.setTimeout(() => {
+      const manager = this.scene.manager
+      const targetReady =
+        manager.isActive(targetScene) &&
+        manager.isVisible(targetScene) &&
+        !manager.isSleeping(targetScene)
+      if (targetReady) {
+        this.transitionWatchdogTimer = null
+        return
+      }
+
+      this.transitioning = false
+      sessionStore.resetToTitle()
+      manager.start(SCENE_KEYS.TITLE)
+      this.transitionWatchdogTimer = null
+    }, 300)
   }
 }
