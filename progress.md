@@ -17,3 +17,11 @@ Original prompt: Vite + Phaser で 2D横スクロールアクション「Runtime
 - カメラ先読みを通常/ダッシュで分離し、Tuning値を反映。
 - 検証: `npm run build` 成功、`VITE_USE_GH_PAGES_BASE=1 npm run build` 成功。
 - 保留: 自動プレイ検証（Playwright導入不能のため）、敵/アイテム/変身/攻撃/CI/README 等。
+- 再開後の現状確認を実施。未コミット差分は保持されており、build/test は現時点で成功。
+- skills確認: develop-web-game / playwright / imagegen の SKILL.md を読み、適用順を明確化。imagegen は現段階で画像生成タスク未着手。
+- develop-web-game要件補完として `window.advanceTime(ms)` を `src/game/index.ts` に追加。
+- `vite.config.ts` の base 切替を強化（`GITHUB_PAGES=true` でも `/runtime-zero/` を選択可能）。
+- 公開運用ファイルを追加: `README.md`, `LICENSE`(MIT), `docs/stage-design.md`, `.github/workflows/pages.yml`。
+- Playwright実プレイは依然としてネットワーク制限で未実施（`registry.npmjs.org` ENOTFOUND）。
+- CI workflow更新: `actions/configure-pages@v5` を追加し、main push時の Pages artifact/deploy を安定化。
+- 検証ループ: `npm run build`, `npm test`, `VITE_USE_GH_PAGES_BASE=1 npm run build` を再実行し全て成功。
