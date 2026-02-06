@@ -13,6 +13,8 @@ export class ResultScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.physics.world.resume()
+
     sessionStore.setFlow('result')
     this.inputMap = new GameInput(this)
     this.menuKey = this.input.keyboard!.addKey('T')

@@ -201,6 +201,8 @@ export class StagePlayScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.physics.world.resume()
+
     const snapshot = sessionStore.snapshot
 
     this.stage = getStageById(snapshot.selectedStageId)
@@ -1679,7 +1681,6 @@ export class StagePlayScene extends Phaser.Scene {
     }
 
     this.stageFinished = true
-    this.physics.world.pause()
     runtimeAudio.stopStageLoop()
 
     const snapshot = sessionStore.snapshot
