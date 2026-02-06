@@ -31,3 +31,5 @@ Original prompt: Vite + Phaser で 2D横スクロールアクション「Runtime
 - Enter/NumpadEnter/Space -> Stage Select, R -> Retry, T/Escape -> Main Menu を明示的に処理し、遷移ロックで多重startを防止。
 - 追加対処: Result画面に `window.addEventListener('keydown')` フォールバックを追加し、Phaser keyboard plugin 側が不発でも遷移できるようにした。
 - さらにクリック遷移ボタン（Stage Select / Retry / Main Menu）をResult下部に追加し、キーボード非依存でも復帰可能にした。
+- 最終フォールバック追加: Result画面で Phaser input が完全停止しても遷移できるよう、`#app` 直下に DOM ボタン（Stage Select/Retry/Main Menu）をマウント。
+- さらに12秒で Stage Select へ自動遷移するタイムアウトを追加し、Resultでの詰みを防止。

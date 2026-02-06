@@ -13,6 +13,8 @@ export class ResultScene extends Phaser.Scene {
   private keydownHandler: ((event: KeyboardEvent) => void) | null = null
   private windowKeydownHandler: ((event: KeyboardEvent) => void) | null = null
   private transitioning = false
+  private domFallbackContainer: HTMLDivElement | null = null
+  private autoAdvanceTimer: number | null = null
 
   constructor() {
     super(SCENE_KEYS.RESULT)
@@ -101,6 +103,7 @@ export class ResultScene extends Phaser.Scene {
     this.createActionButton('Stage Select', 300, 494, () => this.goStageSelect())
     this.createActionButton('Retry', 480, 494, () => this.goRetry())
     this.createActionButton('Main Menu', 660, 494, () => this.goMainMenu())
+    this.mountDomFallbackControls()
 
     setRenderGameToText(() => ({
       mode: 'result',
@@ -117,6 +120,9 @@ export class ResultScene extends Phaser.Scene {
       this.handleRawKeydown(event)
     }
     window.addEventListener('keydown', this.windowKeydownHandler, { passive: false })
+    this.autoAdvanceTimer = window.setTimeout(() => {
+      this.goStageSelect()
+    }, 12000)
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       if (this.keydownHandler) {
@@ -127,6 +133,11 @@ export class ResultScene extends Phaser.Scene {
         window.removeEventListener('keydown', this.windowKeydownHandler)
       }
       this.windowKeydownHandler = null
+      if (this.autoAdvanceTimer !== null) {
+        window.clearTimeout(this.autoAdvanceTimer)
+      }
+      this.autoAdvanceTimer = null
+      this.unmountDomFallbackControls()
       clearRenderGameToText()
     })
   }
@@ -209,6 +220,56 @@ export class ResultScene extends Phaser.Scene {
     button.on('pointerdown', () => {
       onSelect()
     })
+  }
+
+  private mountDomFallbackControls(): void {
+    this.unmountDomFallbackControls()
+
+    const root = document.querySelector<HTMLElement>('#app')
+    if (!root) {
+      return
+    }
+
+    const container = document.createElement('div')
+    container.style.position = 'absolute'
+    container.style.left = '50%'
+    container.style.bottom = '18px'
+    container.style.transform = 'translateX(-50%)'
+    container.style.display = 'flex'
+    container.style.gap = '10px'
+    container.style.zIndex = '9999'
+    container.style.pointerEvents = 'auto'
+
+    const createDomButton = (label: string, onClick: () => void): HTMLButtonElement => {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.textContent = label
+      button.style.fontFamily = 'Trebuchet MS, sans-serif'
+      button.style.fontSize = '16px'
+      button.style.color = '#e8f7ff'
+      button.style.background = '#10324b'
+      button.style.border = '1px solid #6faad0'
+      button.style.borderRadius = '6px'
+      button.style.padding = '8px 12px'
+      button.style.cursor = 'pointer'
+      button.addEventListener('click', () => onClick())
+      return button
+    }
+
+    container.appendChild(createDomButton('Stage Select', () => this.goStageSelect()))
+    container.appendChild(createDomButton('Retry', () => this.goRetry()))
+    container.appendChild(createDomButton('Main Menu', () => this.goMainMenu()))
+
+    root.appendChild(container)
+    this.domFallbackContainer = container
+  }
+
+  private unmountDomFallbackControls(): void {
+    if (!this.domFallbackContainer) {
+      return
+    }
+    this.domFallbackContainer.remove()
+    this.domFallbackContainer = null
   }
 
   private goStageSelect(): void {
