@@ -29,3 +29,5 @@ Original prompt: Vite + Phaser で 2D横スクロールアクション「Runtime
 - 対応: `StagePlay.create()` 先頭で `physics.world.resume()`、`finishRun()` から pause を除去、さらに `ResultScene.create()` でも `physics.world.resume()` を実施して復帰を保証。
 - Result画面遷移の再不具合に対処: `ResultScene` の入力を `GameInput + JustDown` のみから、キーボード状態リセット (`keyboard.resetKeys`) と生 `keydown` ハンドラ併用に変更。
 - Enter/NumpadEnter/Space -> Stage Select, R -> Retry, T/Escape -> Main Menu を明示的に処理し、遷移ロックで多重startを防止。
+- 追加対処: Result画面に `window.addEventListener('keydown')` フォールバックを追加し、Phaser keyboard plugin 側が不発でも遷移できるようにした。
+- さらにクリック遷移ボタン（Stage Select / Retry / Main Menu）をResult下部に追加し、キーボード非依存でも復帰可能にした。

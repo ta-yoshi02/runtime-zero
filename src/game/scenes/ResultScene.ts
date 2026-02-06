@@ -11,6 +11,7 @@ export class ResultScene extends Phaser.Scene {
   private retryKey!: Phaser.Input.Keyboard.Key
   private escKey!: Phaser.Input.Keyboard.Key
   private keydownHandler: ((event: KeyboardEvent) => void) | null = null
+  private windowKeydownHandler: ((event: KeyboardEvent) => void) | null = null
   private transitioning = false
 
   constructor() {
@@ -91,6 +92,16 @@ export class ResultScene extends Phaser.Scene {
       color: '#ffffff',
     }).setOrigin(0.5)
 
+    this.add.text(480, 450, 'If keyboard does not respond, click one of these:', {
+      fontFamily: 'Trebuchet MS',
+      fontSize: '18px',
+      color: '#9fc6e4',
+    }).setOrigin(0.5)
+
+    this.createActionButton('Stage Select', 300, 494, () => this.goStageSelect())
+    this.createActionButton('Retry', 480, 494, () => this.goRetry())
+    this.createActionButton('Main Menu', 660, 494, () => this.goMainMenu())
+
     setRenderGameToText(() => ({
       mode: 'result',
       result,
@@ -102,11 +113,20 @@ export class ResultScene extends Phaser.Scene {
     }
     keyboard?.on('keydown', this.keydownHandler)
 
+    this.windowKeydownHandler = (event: KeyboardEvent) => {
+      this.handleRawKeydown(event)
+    }
+    window.addEventListener('keydown', this.windowKeydownHandler, { passive: false })
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       if (this.keydownHandler) {
         keyboard?.off('keydown', this.keydownHandler)
       }
       this.keydownHandler = null
+      if (this.windowKeydownHandler) {
+        window.removeEventListener('keydown', this.windowKeydownHandler)
+      }
+      this.windowKeydownHandler = null
       clearRenderGameToText()
     })
   }
@@ -141,19 +161,54 @@ export class ResultScene extends Phaser.Scene {
     }
 
     const code = event.code
-    if (code === 'Enter' || code === 'NumpadEnter' || code === 'Space') {
+    const key = event.key.toLowerCase()
+
+    if (code === 'Enter' || code === 'NumpadEnter' || code === 'Space' || key === 'enter' || key === ' ') {
+      event.preventDefault()
       this.goStageSelect()
       return
     }
 
-    if (code === 'KeyR') {
+    if (code === 'KeyR' || key === 'r') {
+      event.preventDefault()
       this.goRetry()
       return
     }
 
-    if (code === 'KeyT' || code === 'Escape') {
+    if (code === 'KeyT' || code === 'Escape' || key === 't' || key === 'escape') {
+      event.preventDefault()
       this.goMainMenu()
     }
+  }
+
+  private createActionButton(
+    label: string,
+    x: number,
+    y: number,
+    onSelect: () => void,
+  ): void {
+    const button = this.add
+      .text(x, y, label, {
+        fontFamily: 'Trebuchet MS',
+        fontSize: '24px',
+        color: '#e8f7ff',
+        backgroundColor: '#11324a',
+        padding: { left: 14, right: 14, top: 8, bottom: 8 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ cursor: 'pointer' })
+
+    button.on('pointerover', () => {
+      button.setColor('#ffffff')
+      button.setBackgroundColor('#1f5273')
+    })
+    button.on('pointerout', () => {
+      button.setColor('#e8f7ff')
+      button.setBackgroundColor('#11324a')
+    })
+    button.on('pointerdown', () => {
+      onSelect()
+    })
   }
 
   private goStageSelect(): void {
