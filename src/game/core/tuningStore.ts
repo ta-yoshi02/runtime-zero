@@ -34,6 +34,8 @@ export const TUNING_FIELDS: TuningFieldDefinition[] = [
   { key: 'cameraLookAheadDash', label: 'Camera Dash Lookahead', min: 0, max: 420, step: 5 },
   { key: 'knockbackStrength', label: 'Knockback Strength', min: 0, max: 700, step: 10 },
   { key: 'invulnTimeMs', label: 'Invuln Time (ms)', min: 0, max: 2200, step: 20 },
+  { key: 'fireCooldownMs', label: 'Shot Cooldown (ms)', min: 50, max: 900, step: 10 },
+  { key: 'shotSpeed', label: 'Shot Speed', min: 200, max: 1300, step: 10 },
 ]
 
 function clampAndSnap(value: number, field: TuningFieldDefinition): number {

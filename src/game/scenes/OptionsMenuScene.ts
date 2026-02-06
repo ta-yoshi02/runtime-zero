@@ -4,72 +4,74 @@ import { SCENE_KEYS } from '../core/sceneKeys'
 import { sessionStore } from '../core/sessionStore'
 import { GameInput } from '../systems/input'
 
+interface OptionsMenuData {
+  returnScene?: string
+}
+
 interface MenuEntry {
   label: string
   action: () => void
 }
 
-export class MainMenuScene extends Phaser.Scene {
+export class OptionsMenuScene extends Phaser.Scene {
   private inputMap!: GameInput
+  private returnScene: string = SCENE_KEYS.MAIN_MENU
   private menuEntries: MenuEntry[] = []
   private menuTexts: Phaser.GameObjects.Text[] = []
   private selectedIndex = 0
 
   constructor() {
-    super(SCENE_KEYS.MAIN_MENU)
+    super(SCENE_KEYS.OPTIONS_MENU)
   }
 
-  create(): void {
-    sessionStore.setFlow('main_menu')
+  create(data?: OptionsMenuData): void {
+    sessionStore.setFlow('options')
 
+    this.returnScene = data?.returnScene ?? SCENE_KEYS.MAIN_MENU
     this.inputMap = new GameInput(this)
 
     this.menuEntries = [
       {
-        label: 'Start',
+        label: 'Tuning',
         action: () => {
-          sessionStore.setFlow('stage_select')
-          this.scene.start(SCENE_KEYS.STAGE_SELECT)
+          this.scene.start(SCENE_KEYS.TUNING, { returnScene: this.returnScene, overlay: false })
         },
       },
       {
-        label: 'Options',
+        label: 'Controls',
         action: () => {
-          sessionStore.setFlow('options')
-          this.scene.start(SCENE_KEYS.OPTIONS_MENU, {
-            returnScene: SCENE_KEYS.MAIN_MENU,
-          })
+          this.scene.start(SCENE_KEYS.CONTROLS, { returnScene: this.returnScene })
         },
       },
       {
-        label: 'Credits',
+        label: 'Back',
         action: () => {
-          sessionStore.setFlow('credits')
-          this.scene.start(SCENE_KEYS.CREDITS)
+          this.scene.start(this.returnScene)
         },
       },
     ]
 
-    this.add.rectangle(480, 270, 960, 540, 0x081a2e, 1)
-    this.add.rectangle(480, 134, 620, 160, 0x14314f, 0.88)
-    this.add.text(480, 96, 'Main Menu', {
+    this.add.rectangle(480, 270, 960, 540, 0x061426, 1)
+    this.add.rectangle(480, 140, 620, 160, 0x183553, 0.9)
+
+    this.add.text(480, 92, 'Options', {
       fontFamily: 'Trebuchet MS',
       fontSize: '54px',
-      color: '#9de9ff',
+      color: '#9de8ff',
     }).setOrigin(0.5)
 
-    this.add.text(480, 160, 'The Legacy is degrading. Choose your next action.', {
+    this.add.text(480, 156, 'Tune controls and movement for Runtime: Zero.', {
       fontFamily: 'Trebuchet MS',
       fontSize: '22px',
-      color: '#c0def6',
+      color: '#cde8ff',
     }).setOrigin(0.5)
 
     this.menuTexts = this.menuEntries.map((entry, index) => {
       const text = this.add
-        .text(480, 260 + index * 62, entry.label, {
+        .text(480, 258 + index * 64, entry.label, {
           fontFamily: 'Trebuchet MS',
           fontSize: '40px',
-          color: '#d3e9fb',
+          color: '#d7eafe',
         })
         .setOrigin(0.5)
         .setInteractive({ cursor: 'pointer' })
@@ -80,13 +82,13 @@ export class MainMenuScene extends Phaser.Scene {
       })
       text.on('pointerdown', () => {
         this.selectedIndex = index
-        this.confirmSelection()
+        this.menuEntries[this.selectedIndex].action()
       })
 
       return text
     })
 
-    this.add.text(480, 488, '↑↓ select  Enter confirm  Esc back title', {
+    this.add.text(480, 492, '↑↓ select  Enter confirm  Esc back', {
       fontFamily: 'Trebuchet MS',
       fontSize: '20px',
       color: '#9bbfdf',
@@ -95,9 +97,9 @@ export class MainMenuScene extends Phaser.Scene {
     this.refreshMenu()
 
     setRenderGameToText(() => ({
-      mode: 'main_menu',
+      mode: 'options_menu',
       selected: this.menuEntries[this.selectedIndex].label,
-      entries: this.menuEntries.map((entry) => entry.label),
+      returnScene: this.returnScene,
     }))
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -117,24 +119,20 @@ export class MainMenuScene extends Phaser.Scene {
     }
 
     if (this.inputMap.consumeConfirmPressed()) {
-      this.confirmSelection()
+      this.menuEntries[this.selectedIndex].action()
+      return
     }
 
     if (this.inputMap.consumeCancelPressed()) {
-      sessionStore.resetToTitle()
-      this.scene.start(SCENE_KEYS.TITLE)
+      this.scene.start(this.returnScene)
     }
   }
 
   private refreshMenu(): void {
     this.menuTexts.forEach((text, index) => {
       const selected = index === this.selectedIndex
-      text.setColor(selected ? '#ffffff' : '#d3e9fb')
+      text.setColor(selected ? '#ffffff' : '#d7eafe')
       text.setText(`${selected ? '▶ ' : '  '}${this.menuEntries[index].label}`)
     })
-  }
-
-  private confirmSelection(): void {
-    this.menuEntries[this.selectedIndex].action()
   }
 }

@@ -50,7 +50,24 @@ export class ResultScene extends Phaser.Scene {
       color: '#90b9d8',
     }).setOrigin(0.5)
 
-    this.add.text(480, 360, 'Enter: Stage Select   R: Retry   T / Esc: Main Menu', {
+    this.add.text(
+      480,
+      326,
+      `Cycles: ${result?.cycles ?? 0}  Gems: ${result?.gems ?? 0}  Hits: ${result?.hits ?? 0}  Backups Used: ${result?.backupsUsed ?? 0}`,
+      {
+        fontFamily: 'Trebuchet MS',
+        fontSize: '21px',
+        color: '#d7efff',
+      },
+    ).setOrigin(0.5)
+
+    this.add.text(480, 364, `Rank: ${result?.rank ?? 'C'}`, {
+      fontFamily: 'Trebuchet MS',
+      fontSize: '36px',
+      color: '#9be9ff',
+    }).setOrigin(0.5)
+
+    this.add.text(480, 418, 'Enter: Stage Select   R: Retry   T / Esc: Main Menu', {
       fontFamily: 'Trebuchet MS',
       fontSize: '24px',
       color: '#ffffff',

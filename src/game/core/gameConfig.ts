@@ -1,7 +1,9 @@
 import Phaser from 'phaser'
 import { BootScene } from '../scenes/BootScene'
+import { ControlsScene } from '../scenes/ControlsScene'
 import { CreditsScene } from '../scenes/CreditsScene'
 import { MainMenuScene } from '../scenes/MainMenuScene'
+import { OptionsMenuScene } from '../scenes/OptionsMenuScene'
 import { ResultScene } from '../scenes/ResultScene'
 import { StagePlayScene } from '../scenes/StagePlayScene'
 import { StageSelectScene } from '../scenes/StageSelectScene'
@@ -37,6 +39,8 @@ export function createGameConfig(parent: HTMLElement): Phaser.Types.Core.GameCon
       BootScene,
       TitleScene,
       MainMenuScene,
+      OptionsMenuScene,
+      ControlsScene,
       StageSelectScene,
       StagePlayScene,
       ResultScene,

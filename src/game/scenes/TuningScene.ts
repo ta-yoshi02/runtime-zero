@@ -270,6 +270,11 @@ export class TuningScene extends Phaser.Scene {
       return
     }
 
+    if (sceneKey === SCENE_KEYS.OPTIONS_MENU || sceneKey === SCENE_KEYS.CONTROLS) {
+      sessionStore.setFlow('options')
+      return
+    }
+
     sessionStore.setFlow('main_menu')
   }
 }

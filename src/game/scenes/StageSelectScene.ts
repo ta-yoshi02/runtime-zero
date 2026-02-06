@@ -79,7 +79,7 @@ export class StageSelectScene extends Phaser.Scene {
       gimmick.setOrigin(0, 0.05)
     })
 
-    this.add.text(78, 505, '↑↓:Stage  ←→:Difficulty  M:Mirror  O/F1:Options  Enter:Start  Esc:Menu', {
+    this.add.text(78, 505, '↑↓:Stage  ←→:Difficulty  M:Mirror  O:Options  F1:Tuning  Enter:Start  Esc:Menu', {
       fontFamily: 'Trebuchet MS',
       fontSize: '18px',
       color: '#7aa7cf',
@@ -133,12 +133,15 @@ export class StageSelectScene extends Phaser.Scene {
       this.scene.start(SCENE_KEYS.STAGE_PLAY)
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.optionsKey) || this.inputMap.consumeTuningPressed()) {
+    if (Phaser.Input.Keyboard.JustDown(this.optionsKey)) {
       sessionStore.setFlow('options')
-      this.scene.start(SCENE_KEYS.TUNING, {
-        returnScene: SCENE_KEYS.STAGE_SELECT,
-        overlay: false,
-      })
+      this.scene.start(SCENE_KEYS.OPTIONS_MENU, { returnScene: SCENE_KEYS.STAGE_SELECT })
+      return
+    }
+
+    if (this.inputMap.consumeTuningPressed()) {
+      sessionStore.setFlow('options')
+      this.scene.start(SCENE_KEYS.TUNING, { returnScene: SCENE_KEYS.STAGE_SELECT, overlay: false })
       return
     }
 

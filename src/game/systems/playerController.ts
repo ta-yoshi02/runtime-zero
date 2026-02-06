@@ -18,6 +18,8 @@ export interface PlayerStateSnapshot {
   running: boolean
   sliding: boolean
   groundPounding: boolean
+  facing: -1 | 1
+  controlLockedMs: number
 }
 
 export class PlayerController {
@@ -32,7 +34,9 @@ export class PlayerController {
   private coyoteRemainingMs = 0
   private slideRemainingMs = 0
   private groundPoundLockRemainingMs = 0
+  private controlLockRemainingMs = 0
 
+  private gravityScale = 1
   private wasGrounded = false
   private facingDirection: -1 | 1 = 1
   private running = false
@@ -51,14 +55,12 @@ export class PlayerController {
     this.body = this.sprite.body as Phaser.Physics.Arcade.Body
     this.body.setSize(24, 44)
     this.body.setOffset(4, 4)
-    this.body.setGravityY(this.tuning.gravity)
-    this.body.setMaxVelocity(this.tuning.runSpeed * 1.25, this.tuning.maxFallSpeed)
+    this.applyPhysicsSettings()
   }
 
   setTuning(tuning: MovementTuning): void {
     this.tuning = tuning
-    this.body.setGravityY(this.tuning.gravity)
-    this.body.setMaxVelocity(this.tuning.runSpeed * 1.25, this.tuning.maxFallSpeed)
+    this.applyPhysicsSettings()
   }
 
   update(deltaMs: number): void {
@@ -75,17 +77,21 @@ export class PlayerController {
       this.coyoteRemainingMs = Math.max(0, this.coyoteRemainingMs - deltaMs)
     }
 
+    if (this.controlLockRemainingMs > 0) {
+      this.controlLockRemainingMs = Math.max(0, this.controlLockRemainingMs - deltaMs)
+    }
+
     if (this.input.consumeJumpPressed()) {
       this.jumpBufferRemainingMs = this.tuning.jumpBufferMs
     } else {
       this.jumpBufferRemainingMs = Math.max(0, this.jumpBufferRemainingMs - deltaMs)
     }
 
-    if (!grounded && this.input.consumeDownPressed() && !this.groundPounding) {
+    if (!grounded && this.controlLockRemainingMs <= 0 && this.input.consumeDownPressed() && !this.groundPounding) {
       this.startGroundPound()
     }
 
-    if (this.canStartSlide(grounded)) {
+    if (this.controlLockRemainingMs <= 0 && this.canStartSlide(grounded)) {
       this.startSlide()
     }
 
@@ -98,7 +104,7 @@ export class PlayerController {
       this.updateHorizontalVelocity(dt, grounded)
     }
 
-    if (!this.groundPounding || this.groundPoundLockRemainingMs <= 0) {
+    if (this.controlLockRemainingMs <= 0 && (!this.groundPounding || this.groundPoundLockRemainingMs <= 0)) {
       this.tryConsumeJump(grounded)
     }
 
@@ -106,6 +112,11 @@ export class PlayerController {
     this.clampFallSpeed()
 
     this.wasGrounded = grounded
+  }
+
+  setGravityScale(scale: number): void {
+    this.gravityScale = scale
+    this.applyPhysicsSettings()
   }
 
   getLookAhead(): number {
@@ -124,6 +135,51 @@ export class PlayerController {
     return Phaser.Math.Clamp(ratio * maxLookAhead, -maxLookAhead, maxLookAhead)
   }
 
+  setSpawnPosition(spawn: SpawnPoint): void {
+    this.sprite.setPosition(spawn.x, spawn.y)
+    this.body.setVelocity(0, 0)
+    this.controlLockRemainingMs = 0
+    this.groundPounding = false
+    this.running = false
+    this.endSlide()
+  }
+
+  applyKnockback(direction: -1 | 1, horizontalStrength: number, verticalStrength: number): void {
+    this.endSlide()
+    this.groundPounding = false
+    this.running = false
+    this.body.setVelocityX(direction * horizontalStrength)
+    this.body.setVelocityY(-Math.abs(verticalStrength))
+  }
+
+  lockControls(ms: number): void {
+    this.controlLockRemainingMs = Math.max(this.controlLockRemainingMs, ms)
+  }
+
+  clearControlLock(): void {
+    this.controlLockRemainingMs = 0
+  }
+
+  isGrounded(): boolean {
+    return this.body.blocked.down || this.body.touching.down
+  }
+
+  isGroundPounding(): boolean {
+    return this.groundPounding
+  }
+
+  isRunning(): boolean {
+    return this.running
+  }
+
+  getFacingDirection(): -1 | 1 {
+    return this.facingDirection
+  }
+
+  getBody(): Phaser.Physics.Arcade.Body {
+    return this.body
+  }
+
   getStateSnapshot(): PlayerStateSnapshot {
     return {
       x: this.sprite.x,
@@ -136,11 +192,14 @@ export class PlayerController {
       running: this.running,
       sliding: this.sliding,
       groundPounding: this.groundPounding,
+      facing: this.facingDirection,
+      controlLockedMs: this.controlLockRemainingMs,
     }
   }
 
-  private isGrounded(): boolean {
-    return this.body.blocked.down || this.body.touching.down
+  private applyPhysicsSettings(): void {
+    this.body.setGravityY(this.tuning.gravity * this.gravityScale)
+    this.body.setMaxVelocity(this.tuning.runSpeed * 1.25, this.tuning.maxFallSpeed)
   }
 
   private canStartSlide(grounded: boolean): boolean {
@@ -225,10 +284,10 @@ export class PlayerController {
   }
 
   private updateHorizontalVelocity(dt: number, grounded: boolean): void {
-    const axis = this.input.getMoveAxis()
+    const axis = this.controlLockRemainingMs > 0 ? 0 : this.input.getMoveAxis()
     const currentVelocity = this.body.velocity.x
 
-    const runHeld = this.input.isRunHeld()
+    const runHeld = this.controlLockRemainingMs <= 0 && this.input.isRunHeld()
     this.running = runHeld && axis !== 0
     const targetSpeed = this.running ? this.tuning.runSpeed : this.tuning.walkSpeed
 
