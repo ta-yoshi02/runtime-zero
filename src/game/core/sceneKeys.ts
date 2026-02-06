@@ -1,0 +1,7 @@
+export const SCENE_KEYS = {
+  BOOT: 'BOOT',
+  TITLE: 'TITLE',
+  STAGE_SELECT: 'STAGE_SELECT',
+  STAGE_PLAY: 'STAGE_PLAY',
+  RESULT: 'RESULT',
+} as const
