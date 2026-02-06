@@ -11,6 +11,7 @@ export class StageSelectScene extends Phaser.Scene {
   private leftKey!: Phaser.Input.Keyboard.Key
   private rightKey!: Phaser.Input.Keyboard.Key
   private mirrorKey!: Phaser.Input.Keyboard.Key
+  private optionsKey!: Phaser.Input.Keyboard.Key
   private difficultyText!: Phaser.GameObjects.Text
   private mirrorText!: Phaser.GameObjects.Text
   private stageRows: Phaser.GameObjects.Text[] = []
@@ -27,6 +28,7 @@ export class StageSelectScene extends Phaser.Scene {
     this.leftKey = this.input.keyboard!.addKey('LEFT')
     this.rightKey = this.input.keyboard!.addKey('RIGHT')
     this.mirrorKey = this.input.keyboard!.addKey('M')
+    this.optionsKey = this.input.keyboard!.addKey('O')
 
     this.selectedIndex = Math.max(
       0,
@@ -77,7 +79,7 @@ export class StageSelectScene extends Phaser.Scene {
       gimmick.setOrigin(0, 0.05)
     })
 
-    this.add.text(78, 505, '↑↓:Stage  ←→:Difficulty  M:Mirror  Enter:Start  Esc:Title', {
+    this.add.text(78, 505, '↑↓:Stage  ←→:Difficulty  M:Mirror  O/F1:Options  Enter:Start  Esc:Menu', {
       fontFamily: 'Trebuchet MS',
       fontSize: '18px',
       color: '#7aa7cf',
@@ -131,9 +133,18 @@ export class StageSelectScene extends Phaser.Scene {
       this.scene.start(SCENE_KEYS.STAGE_PLAY)
     }
 
+    if (Phaser.Input.Keyboard.JustDown(this.optionsKey) || this.inputMap.consumeTuningPressed()) {
+      sessionStore.setFlow('options')
+      this.scene.start(SCENE_KEYS.TUNING, {
+        returnScene: SCENE_KEYS.STAGE_SELECT,
+        overlay: false,
+      })
+      return
+    }
+
     if (this.inputMap.consumeCancelPressed()) {
-      sessionStore.resetToTitle()
-      this.scene.start(SCENE_KEYS.TITLE)
+      sessionStore.setFlow('main_menu')
+      this.scene.start(SCENE_KEYS.MAIN_MENU)
     }
   }
 

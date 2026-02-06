@@ -1,5 +1,12 @@
 export type Difficulty = 'Chill' | 'Standard' | 'Mean'
-export type FlowState = 'title' | 'stage_select' | 'ingame' | 'result'
+export type FlowState =
+  | 'title'
+  | 'main_menu'
+  | 'stage_select'
+  | 'ingame'
+  | 'result'
+  | 'options'
+  | 'credits'
 
 export interface Point {
   x: number
@@ -30,15 +37,29 @@ export interface StageDefinition {
 }
 
 export interface MovementTuning {
-  maxRunSpeed: number
+  walkSpeed: number
+  runSpeed: number
   groundAcceleration: number
   airAcceleration: number
   groundDeceleration: number
   airDeceleration: number
   jumpVelocity: number
   jumpCutVelocity: number
+  gravity: number
+  maxFallSpeed: number
   coyoteTimeMs: number
   jumpBufferMs: number
+  wallJumpXVelocity: number
+  wallJumpYVelocity: number
+  slideSpeed: number
+  slideDurationMs: number
+  slideEnterBoost: number
+  groundPoundVelocity: number
+  groundPoundLockMs: number
+  cameraLookAhead: number
+  cameraLookAheadDash: number
+  knockbackStrength: number
+  invulnTimeMs: number
 }
 
 export interface RunResult {

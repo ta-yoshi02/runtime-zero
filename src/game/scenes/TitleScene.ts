@@ -61,11 +61,11 @@ export class TitleScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
     })
 
-    this.input.on('pointerdown', () => this.openStageSelect())
+    this.input.on('pointerdown', () => this.openMainMenu())
 
     setRenderGameToText(() => ({
       mode: 'title',
-      prompt: 'Press Enter or Space to open stage select',
+      prompt: 'Press Enter or Space to open main menu',
     }))
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -75,12 +75,12 @@ export class TitleScene extends Phaser.Scene {
 
   update(): void {
     if (this.inputMap.consumeConfirmPressed()) {
-      this.openStageSelect()
+      this.openMainMenu()
     }
   }
 
-  private openStageSelect(): void {
-    sessionStore.setFlow('stage_select')
-    this.scene.start(SCENE_KEYS.STAGE_SELECT)
+  private openMainMenu(): void {
+    sessionStore.setFlow('main_menu')
+    this.scene.start(SCENE_KEYS.MAIN_MENU)
   }
 }

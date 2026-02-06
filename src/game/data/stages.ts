@@ -65,28 +65,50 @@ function makeStage(index: number): StageDefinition {
 export const stages: StageDefinition[] = Array.from({ length: 8 }, (_, index) => makeStage(index))
 
 const baseMovement: MovementTuning = {
-  maxRunSpeed: 320,
+  walkSpeed: 300,
+  runSpeed: 420,
   groundAcceleration: 2100,
   airAcceleration: 1450,
   groundDeceleration: 2500,
   airDeceleration: 900,
   jumpVelocity: 760,
   jumpCutVelocity: 300,
+  gravity: 1800,
+  maxFallSpeed: 980,
   coyoteTimeMs: 120,
   jumpBufferMs: 120,
+  wallJumpXVelocity: 390,
+  wallJumpYVelocity: 720,
+  slideSpeed: 460,
+  slideDurationMs: 300,
+  slideEnterBoost: 55,
+  groundPoundVelocity: 1200,
+  groundPoundLockMs: 120,
+  cameraLookAhead: 120,
+  cameraLookAheadDash: 220,
+  knockbackStrength: 280,
+  invulnTimeMs: 650,
 }
 
 const movementOverrides: Record<Difficulty, Partial<MovementTuning>> = {
   Chill: {
+    walkSpeed: 290,
+    runSpeed: 395,
+    gravity: 1650,
     coyoteTimeMs: 180,
     jumpBufferMs: 170,
-    maxRunSpeed: 300,
+    cameraLookAhead: 105,
+    cameraLookAheadDash: 195,
   },
   Standard: {},
   Mean: {
+    walkSpeed: 320,
+    runSpeed: 450,
+    gravity: 1950,
     coyoteTimeMs: 80,
     jumpBufferMs: 80,
-    maxRunSpeed: 340,
+    cameraLookAhead: 130,
+    cameraLookAheadDash: 240,
   },
 }
 

@@ -2,12 +2,11 @@ import Phaser from 'phaser'
 import { clearRenderGameToText, setRenderGameToText } from '../core/browserHooks'
 import { SCENE_KEYS } from '../core/sceneKeys'
 import { sessionStore } from '../core/sessionStore'
-import { getMovementTuning, getStageById } from '../data/stages'
+import { tuningStore } from '../core/tuningStore'
+import { getStageById } from '../data/stages'
 import { GameInput } from '../systems/input'
 import { PlayerController } from '../systems/playerController'
-import type { Rect, RunResult, StageDefinition } from '../types'
-
-const CAMERA_LOOK_AHEAD = 120
+import type { MovementTuning, Rect, RunResult, StageDefinition } from '../types'
 
 type PauseOption = 'Resume' | 'Restart Stage' | 'Exit to Stage Select'
 
@@ -15,6 +14,7 @@ export class StagePlayScene extends Phaser.Scene {
   private inputMap!: GameInput
   private player!: PlayerController
   private stage!: StageDefinition
+  private activeTuning!: MovementTuning
   private stageStartTimeMs = 0
   private stageFinished = false
   private paused = false
@@ -28,6 +28,10 @@ export class StagePlayScene extends Phaser.Scene {
   private pauseOptions: PauseOption[] = ['Resume', 'Restart Stage', 'Exit to Stage Select']
   private pauseOptionTexts: Phaser.GameObjects.Text[] = []
   private pauseIndex = 0
+  private readonly onResumeHandler = (): void => {
+    this.physics.world.resume()
+    this.refreshHud()
+  }
 
   constructor() {
     super(SCENE_KEYS.STAGE_PLAY)
@@ -39,13 +43,15 @@ export class StagePlayScene extends Phaser.Scene {
     sessionStore.setFlow('ingame')
 
     this.inputMap = new GameInput(this)
+    this.inputMap.setHorizontalScale(snapshot.mirror ? -1 : 1)
+    this.activeTuning = tuningStore.getResolvedTuning(snapshot.difficulty)
 
     this.setupWorld()
     this.createBackdrop()
     this.createPlatforms(snapshot.mirror)
 
     const spawn = this.transformPoint(this.stage.spawn, snapshot.mirror)
-    this.player = new PlayerController(this, this.inputMap, spawn, getMovementTuning(snapshot.difficulty))
+    this.player = new PlayerController(this, this.inputMap, spawn, this.activeTuning)
     this.physics.add.collider(this.player.sprite, this.platforms)
 
     this.createGoal(snapshot.mirror)
@@ -74,7 +80,10 @@ export class StagePlayScene extends Phaser.Scene {
 
     setRenderGameToText(() => this.makeTextState())
 
+    this.events.off(Phaser.Scenes.Events.RESUME, this.onResumeHandler, this)
+    this.events.on(Phaser.Scenes.Events.RESUME, this.onResumeHandler, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.events.off(Phaser.Scenes.Events.RESUME, this.onResumeHandler, this)
       clearRenderGameToText()
     })
   }
@@ -84,8 +93,15 @@ export class StagePlayScene extends Phaser.Scene {
       return
     }
 
+    this.syncTuning()
+
     if (this.paused) {
       this.updatePauseMenu()
+      return
+    }
+
+    if (this.inputMap.consumeTuningPressed()) {
+      this.openTuningOverlay()
       return
     }
 
@@ -312,8 +328,27 @@ export class StagePlayScene extends Phaser.Scene {
     this.scene.restart()
   }
 
+  private syncTuning(): void {
+    const difficulty = sessionStore.snapshot.difficulty
+    this.activeTuning = tuningStore.getResolvedTuning(difficulty)
+    this.player.setTuning(this.activeTuning)
+  }
+
+  private openTuningOverlay(): void {
+    if (this.scene.isActive(SCENE_KEYS.TUNING)) {
+      return
+    }
+
+    this.physics.world.pause()
+    this.scene.pause()
+    this.scene.launch(SCENE_KEYS.TUNING, {
+      returnScene: SCENE_KEYS.STAGE_PLAY,
+      overlay: true,
+    })
+  }
+
   private updateCameraLookAhead(): void {
-    const lookAhead = this.player.getLookAhead(CAMERA_LOOK_AHEAD)
+    const lookAhead = this.player.getLookAhead()
     const camera = this.cameras.main
     camera.followOffset.x = Phaser.Math.Linear(camera.followOffset.x, lookAhead, 0.14)
   }
@@ -326,7 +361,7 @@ export class StagePlayScene extends Phaser.Scene {
       `Stage ${this.stage.index.toString().padStart(2, '0')} ${this.stage.name} (${this.stage.theme})`,
       `Difficulty: ${snapshot.difficulty}  Mirror: ${snapshot.mirror ? 'ON' : 'OFF'}  Time: ${elapsedSeconds}s`,
       this.paused ? 'Paused' : 'Reach Kernel. Drop below map = Null Pointer.',
-      'Controls: Move A/D Jump Space/W/↑ Pause Esc/P Restart R',
+      'Controls: Move A/D Run Shift Slide Shift+Down Wall Jump Jump@Wall Ground Pound Down(in air) F1 Tuning',
     ])
   }
 
@@ -356,6 +391,8 @@ export class StagePlayScene extends Phaser.Scene {
 
   private makeTextState(): Record<string, unknown> {
     const snapshot = sessionStore.snapshot
+    const hints = this.stage.gemHints.map((hint) => this.transformPoint(hint, snapshot.mirror))
+
     return {
       mode: 'ingame',
       coordinateSystem: 'origin(0,0) top-left; +x right; +y down',
@@ -368,7 +405,14 @@ export class StagePlayScene extends Phaser.Scene {
       },
       player: this.player.getStateSnapshot(),
       goal: this.transformedGoal,
-      hints: this.stage.gemHints,
+      hints,
+      tuning: {
+        walkSpeed: this.activeTuning.walkSpeed,
+        runSpeed: this.activeTuning.runSpeed,
+        jumpVelocity: this.activeTuning.jumpVelocity,
+        coyoteTimeMs: this.activeTuning.coyoteTimeMs,
+        jumpBufferMs: this.activeTuning.jumpBufferMs,
+      },
     }
   }
 

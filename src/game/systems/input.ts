@@ -6,16 +6,20 @@ export class GameInput {
   private readonly leftKeys: Key[]
   private readonly rightKeys: Key[]
   private readonly jumpKeys: Key[]
+  private readonly runKeys: Key[]
   private readonly upKeys: Key[]
   private readonly downKeys: Key[]
   private readonly confirmKeys: Key[]
   private readonly cancelKeys: Key[]
   private readonly pauseKeys: Key[]
   private readonly restartKeys: Key[]
+  private readonly tuningKeys: Key[]
+  private horizontalScale = 1
 
   constructor(scene: Phaser.Scene) {
     this.leftKeys = [scene.input.keyboard!.addKey('LEFT'), scene.input.keyboard!.addKey('A')]
     this.rightKeys = [scene.input.keyboard!.addKey('RIGHT'), scene.input.keyboard!.addKey('D')]
+    this.runKeys = [scene.input.keyboard!.addKey('SHIFT'), scene.input.keyboard!.addKey('X')]
     this.jumpKeys = [
       scene.input.keyboard!.addKey('SPACE'),
       scene.input.keyboard!.addKey('UP'),
@@ -27,6 +31,11 @@ export class GameInput {
     this.cancelKeys = [scene.input.keyboard!.addKey('ESC')]
     this.pauseKeys = [scene.input.keyboard!.addKey('P')]
     this.restartKeys = [scene.input.keyboard!.addKey('R')]
+    this.tuningKeys = [scene.input.keyboard!.addKey('F1')]
+  }
+
+  setHorizontalScale(scale: number): void {
+    this.horizontalScale = scale >= 0 ? 1 : -1
   }
 
   getMoveAxis(): number {
@@ -37,7 +46,15 @@ export class GameInput {
       return 0
     }
 
-    return left ? -1 : 1
+    return (left ? -1 : 1) * this.horizontalScale
+  }
+
+  isRunHeld(): boolean {
+    return this.anyDown(this.runKeys)
+  }
+
+  isDownHeld(): boolean {
+    return this.anyDown(this.downKeys)
   }
 
   isJumpHeld(): boolean {
@@ -62,6 +79,10 @@ export class GameInput {
 
   consumeRestartPressed(): boolean {
     return this.anyJustDown(this.restartKeys)
+  }
+
+  consumeTuningPressed(): boolean {
+    return this.anyJustDown(this.tuningKeys)
   }
 
   consumeUpPressed(): boolean {

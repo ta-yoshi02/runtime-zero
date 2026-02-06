@@ -6,7 +6,7 @@ import { GameInput } from '../systems/input'
 
 export class ResultScene extends Phaser.Scene {
   private inputMap!: GameInput
-  private titleKey!: Phaser.Input.Keyboard.Key
+  private menuKey!: Phaser.Input.Keyboard.Key
 
   constructor() {
     super(SCENE_KEYS.RESULT)
@@ -15,7 +15,7 @@ export class ResultScene extends Phaser.Scene {
   create(): void {
     sessionStore.setFlow('result')
     this.inputMap = new GameInput(this)
-    this.titleKey = this.input.keyboard!.addKey('T')
+    this.menuKey = this.input.keyboard!.addKey('T')
 
     const result = sessionStore.snapshot.result
 
@@ -50,7 +50,7 @@ export class ResultScene extends Phaser.Scene {
       color: '#90b9d8',
     }).setOrigin(0.5)
 
-    this.add.text(480, 360, 'Enter: Stage Select   R: Retry   T / Esc: Title', {
+    this.add.text(480, 360, 'Enter: Stage Select   R: Retry   T / Esc: Main Menu', {
       fontFamily: 'Trebuchet MS',
       fontSize: '24px',
       color: '#ffffff',
@@ -59,7 +59,7 @@ export class ResultScene extends Phaser.Scene {
     setRenderGameToText(() => ({
       mode: 'result',
       result,
-      prompt: 'Enter stage select / R retry / T title',
+      prompt: 'Enter stage select / R retry / T main menu',
     }))
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -80,9 +80,9 @@ export class ResultScene extends Phaser.Scene {
       return
     }
 
-    if (this.inputMap.consumeCancelPressed() || Phaser.Input.Keyboard.JustDown(this.titleKey)) {
-      sessionStore.resetToTitle()
-      this.scene.start(SCENE_KEYS.TITLE)
+    if (this.inputMap.consumeCancelPressed() || Phaser.Input.Keyboard.JustDown(this.menuKey)) {
+      sessionStore.setFlow('main_menu')
+      this.scene.start(SCENE_KEYS.MAIN_MENU)
     }
   }
 }

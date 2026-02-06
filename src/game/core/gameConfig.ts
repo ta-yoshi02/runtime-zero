@@ -1,8 +1,11 @@
 import Phaser from 'phaser'
 import { BootScene } from '../scenes/BootScene'
+import { CreditsScene } from '../scenes/CreditsScene'
+import { MainMenuScene } from '../scenes/MainMenuScene'
 import { ResultScene } from '../scenes/ResultScene'
 import { StagePlayScene } from '../scenes/StagePlayScene'
 import { StageSelectScene } from '../scenes/StageSelectScene'
+import { TuningScene } from '../scenes/TuningScene'
 import { TitleScene } from '../scenes/TitleScene'
 
 export const GAME_WIDTH = 960
@@ -26,10 +29,19 @@ export function createGameConfig(parent: HTMLElement): Phaser.Types.Core.GameCon
     physics: {
       default: 'arcade',
       arcade: {
-        gravity: { x: 0, y: 1800 },
+        gravity: { x: 0, y: 0 },
         debug: false,
       },
     },
-    scene: [BootScene, TitleScene, StageSelectScene, StagePlayScene, ResultScene],
+    scene: [
+      BootScene,
+      TitleScene,
+      MainMenuScene,
+      StageSelectScene,
+      StagePlayScene,
+      ResultScene,
+      TuningScene,
+      CreditsScene,
+    ],
   }
 }
