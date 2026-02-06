@@ -7,6 +7,11 @@ import { GameInput } from '../systems/input'
 export class ResultScene extends Phaser.Scene {
   private inputMap!: GameInput
   private menuKey!: Phaser.Input.Keyboard.Key
+  private enterKey!: Phaser.Input.Keyboard.Key
+  private retryKey!: Phaser.Input.Keyboard.Key
+  private escKey!: Phaser.Input.Keyboard.Key
+  private keydownHandler: ((event: KeyboardEvent) => void) | null = null
+  private transitioning = false
 
   constructor() {
     super(SCENE_KEYS.RESULT)
@@ -16,8 +21,19 @@ export class ResultScene extends Phaser.Scene {
     this.physics.world.resume()
 
     sessionStore.setFlow('result')
+    this.transitioning = false
+
+    const keyboard = this.input.keyboard
+    if (keyboard) {
+      keyboard.enabled = true
+      keyboard.resetKeys()
+    }
+
     this.inputMap = new GameInput(this)
     this.menuKey = this.input.keyboard!.addKey('T')
+    this.enterKey = this.input.keyboard!.addKey('ENTER')
+    this.retryKey = this.input.keyboard!.addKey('R')
+    this.escKey = this.input.keyboard!.addKey('ESC')
 
     const result = sessionStore.snapshot.result
 
@@ -81,27 +97,92 @@ export class ResultScene extends Phaser.Scene {
       prompt: 'Enter stage select / R retry / T main menu',
     }))
 
+    this.keydownHandler = (event: KeyboardEvent) => {
+      this.handleRawKeydown(event)
+    }
+    keyboard?.on('keydown', this.keydownHandler)
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.keydownHandler) {
+        keyboard?.off('keydown', this.keydownHandler)
+      }
+      this.keydownHandler = null
       clearRenderGameToText()
     })
   }
 
   update(): void {
-    if (this.inputMap.consumeConfirmPressed()) {
-      sessionStore.setFlow('stage_select')
-      this.scene.start(SCENE_KEYS.STAGE_SELECT)
+    if (this.transitioning) {
       return
     }
 
-    if (this.inputMap.consumeRestartPressed()) {
-      sessionStore.setFlow('ingame')
-      this.scene.start(SCENE_KEYS.STAGE_PLAY)
+    if (this.inputMap.consumeConfirmPressed() || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+      this.goStageSelect()
       return
     }
 
-    if (this.inputMap.consumeCancelPressed() || Phaser.Input.Keyboard.JustDown(this.menuKey)) {
-      sessionStore.setFlow('main_menu')
-      this.scene.start(SCENE_KEYS.MAIN_MENU)
+    if (this.inputMap.consumeRestartPressed() || Phaser.Input.Keyboard.JustDown(this.retryKey)) {
+      this.goRetry()
+      return
     }
+
+    if (
+      this.inputMap.consumeCancelPressed() ||
+      Phaser.Input.Keyboard.JustDown(this.menuKey) ||
+      Phaser.Input.Keyboard.JustDown(this.escKey)
+    ) {
+      this.goMainMenu()
+    }
+  }
+
+  private handleRawKeydown(event: KeyboardEvent): void {
+    if (this.transitioning) {
+      return
+    }
+
+    const code = event.code
+    if (code === 'Enter' || code === 'NumpadEnter' || code === 'Space') {
+      this.goStageSelect()
+      return
+    }
+
+    if (code === 'KeyR') {
+      this.goRetry()
+      return
+    }
+
+    if (code === 'KeyT' || code === 'Escape') {
+      this.goMainMenu()
+    }
+  }
+
+  private goStageSelect(): void {
+    if (this.transitioning) {
+      return
+    }
+
+    this.transitioning = true
+    sessionStore.setFlow('stage_select')
+    this.scene.start(SCENE_KEYS.STAGE_SELECT)
+  }
+
+  private goRetry(): void {
+    if (this.transitioning) {
+      return
+    }
+
+    this.transitioning = true
+    sessionStore.setFlow('ingame')
+    this.scene.start(SCENE_KEYS.STAGE_PLAY)
+  }
+
+  private goMainMenu(): void {
+    if (this.transitioning) {
+      return
+    }
+
+    this.transitioning = true
+    sessionStore.setFlow('main_menu')
+    this.scene.start(SCENE_KEYS.MAIN_MENU)
   }
 }

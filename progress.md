@@ -27,3 +27,5 @@ Original prompt: Vite + Phaser で 2D横スクロールアクション「Runtime
 - 検証ループ: `npm run build`, `npm test`, `VITE_USE_GH_PAGES_BASE=1 npm run build` を再実行し全て成功。
 - 不具合修正: クリア後Result遷移時に `StagePlay.finishRun()` が `physics.world.pause()` を残し、次回ステージ開始後に操作してもキャラが動かない症状を確認。
 - 対応: `StagePlay.create()` 先頭で `physics.world.resume()`、`finishRun()` から pause を除去、さらに `ResultScene.create()` でも `physics.world.resume()` を実施して復帰を保証。
+- Result画面遷移の再不具合に対処: `ResultScene` の入力を `GameInput + JustDown` のみから、キーボード状態リセット (`keyboard.resetKeys`) と生 `keydown` ハンドラ併用に変更。
+- Enter/NumpadEnter/Space -> Stage Select, R -> Retry, T/Escape -> Main Menu を明示的に処理し、遷移ロックで多重startを防止。
