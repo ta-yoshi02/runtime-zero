@@ -40,3 +40,5 @@ Original prompt: Vite + Phaser で 2D横スクロールアクション「Runtime
 - 遷移失敗フェイルセーフを追加: `bootIntent` (sessionStorage) を導入し、Resultからの遷移失敗時は目的sceneを保存して `window.location.reload()`。
 - BootScene で bootIntent を消費し、stage/difficulty/mirror を復元して目的sceneへ直接復帰。
 - SessionStore に `setDifficulty` / `setMirror` を追加して復元経路を明示。
+- ユーザー要望に合わせて Result画面の重複UIを撤去。追加していた in-canvas ボタン群と DOM フォールバックボタンを削除し、表示は元のキーヒントのみへ戻した。
+- 遷移安定化の中核（window keydown fallback + watchdog/reload fallback）は維持。
