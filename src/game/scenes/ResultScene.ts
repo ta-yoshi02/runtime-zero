@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { setBootIntent } from '../core/bootIntent'
 import { clearRenderGameToText, setRenderGameToText } from '../core/browserHooks'
 import { SCENE_KEYS } from '../core/sceneKeys'
 import { sessionStore } from '../core/sessionStore'
@@ -299,7 +300,12 @@ export class ResultScene extends Phaser.Scene {
 
     this.transitioning = true
     sessionStore.setFlow(nextFlow)
-    this.scene.start(targetScene)
+    try {
+      this.scene.start(targetScene)
+    } catch {
+      this.reloadToTargetScene(targetScene)
+      return
+    }
 
     // If target scene fails to boot for any reason, recover to Title.
     this.transitionWatchdogTimer = window.setTimeout(() => {
@@ -313,10 +319,19 @@ export class ResultScene extends Phaser.Scene {
         return
       }
 
-      this.transitioning = false
-      sessionStore.resetToTitle()
-      manager.start(SCENE_KEYS.TITLE)
+      this.reloadToTargetScene(targetScene)
       this.transitionWatchdogTimer = null
     }, 300)
+  }
+
+  private reloadToTargetScene(targetScene: string): void {
+    const snapshot = sessionStore.snapshot
+    setBootIntent({
+      targetScene,
+      selectedStageId: snapshot.selectedStageId,
+      difficulty: snapshot.difficulty,
+      mirror: snapshot.mirror,
+    })
+    window.location.reload()
   }
 }

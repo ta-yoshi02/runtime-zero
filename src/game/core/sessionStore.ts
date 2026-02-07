@@ -26,6 +26,14 @@ class GameSessionStore {
     this.state.selectedStageId = stageId
   }
 
+  setDifficulty(difficulty: Difficulty): void {
+    this.state.difficulty = difficulty
+  }
+
+  setMirror(mirror: boolean): void {
+    this.state.mirror = mirror
+  }
+
   shiftDifficulty(delta: 1 | -1): void {
     const current = DIFFICULTY_ORDER.indexOf(this.state.difficulty)
     const nextIndex = (current + delta + DIFFICULTY_ORDER.length) % DIFFICULTY_ORDER.length

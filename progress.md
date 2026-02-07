@@ -37,3 +37,6 @@ Original prompt: Vite + Phaser で 2D横スクロールアクション「Runtime
 - 目的: Resultからの遷移時に次シーン起動失敗でフリーズフレームが残るケースを自動回復。
 - 追加修正: Result shutdown 時に watchdog を消してしまい、遷移失敗時の回復が走らない不具合を修正。
 - watchdog判定を `isActive && isVisible && !isSleeping` に強化し、未起動時は Title へ確実復帰するようにした。
+- 遷移失敗フェイルセーフを追加: `bootIntent` (sessionStorage) を導入し、Resultからの遷移失敗時は目的sceneを保存して `window.location.reload()`。
+- BootScene で bootIntent を消費し、stage/difficulty/mirror を復元して目的sceneへ直接復帰。
+- SessionStore に `setDifficulty` / `setMirror` を追加して復元経路を明示。

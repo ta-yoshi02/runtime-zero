@@ -1,5 +1,7 @@
 import Phaser from 'phaser'
+import { consumeBootIntent } from '../core/bootIntent'
 import { SCENE_KEYS } from '../core/sceneKeys'
+import { sessionStore } from '../core/sessionStore'
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -34,6 +36,15 @@ export class BootScene extends Phaser.Scene {
     this.ensureCircleTexture('player-shot', 9, 0x8af7ff)
     this.ensureCircleTexture('enemy-shot', 10, 0xff6e8d)
     this.ensureBinaryTexture('binary-overlay', 128, 128)
+
+    const bootIntent = consumeBootIntent()
+    if (bootIntent) {
+      sessionStore.setSelectedStage(bootIntent.selectedStageId)
+      sessionStore.setDifficulty(bootIntent.difficulty)
+      sessionStore.setMirror(bootIntent.mirror)
+      this.scene.start(bootIntent.targetScene)
+      return
+    }
 
     this.scene.start(SCENE_KEYS.TITLE)
   }
