@@ -42,3 +42,6 @@ Original prompt: Vite + Phaser で 2D横スクロールアクション「Runtime
 - SessionStore に `setDifficulty` / `setMirror` を追加して復元経路を明示。
 - ユーザー要望に合わせて Result画面の重複UIを撤去。追加していた in-canvas ボタン群と DOM フォールバックボタンを削除し、表示は元のキーヒントのみへ戻した。
 - 遷移安定化の中核（window keydown fallback + watchdog/reload fallback）は維持。
+- 公開不具合調査: `https://ta-yoshi02.github.io/runtime-zero/` は `dist` ではなくリポジトリ直下 `index.html` と `src/main.ts` を配信していることを確認（GitHub Pages側の `pages-build-deployment`/Jekyll 経路）。
+- `gh run` 調査で `.github/workflows/pages.yml` の `CI and Pages` は `actions/configure-pages@v5` で「Pages site not found」で失敗しており、その結果として `pages-build-deployment` が代替実行される状態を確認。
+- 対応: `.github/workflows/pages.yml` の `actions/configure-pages@v5` に `with: enablement: true` を追加し、Pages未初期化時でも workflow でサイト初期化して `dist` デプロイ経路へ復帰できるようにした。
