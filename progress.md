@@ -73,3 +73,53 @@ Original prompt: Vite + Phaser で 2D横スクロールアクション「Runtime
 - 検証: `npm run build` / `npm test` 成功。
 - 追加調整: チェックポイント復帰位置をさらに上げるため `CHECKPOINT_RESPAWN_CLEARANCE_Y=12` を導入し、地面算出位置から上方向にオフセットして復帰させるよう変更。
 - 検証: `npm run build` / `npm test` 成功。
+- Stage4の赤い四角(弾)が停止して見える問題に対処。
+  - `ShotRuntime` に速度保持を追加し、`updateShots()` 内で毎フレーム `enforceShotVelocity()` を適用して弾の速度を再保証。
+  - `player-shot`/`enemy-shot` 生成時に `velocityX/velocityY` を保存。
+  - `shotSpeed` が不正値でも最低速度を確保するフォールバックを追加。
+- 目的: 弾がその場に留まる現象を防ぎ、進行方向へ安定して飛ぶようにする。
+- 検証: `npm run build` / `npm test` 成功。
+- 被弾時の「主人公が消えたように見える」問題へ対処。
+  - `respawnAtCheckpoint()` で復帰座標へ移動直後に `snapCameraToPosition()` を実行し、カメラを即時スナップするよう変更。
+  - これにより、RAW状態被弾で遠距離リスポーンしても画面外に取り残されず、挙動が明確になる。
+- 検証: `npm run build` / `npm test` 成功。
+- 追加不具合対応（ユーザー報告）:
+  - 被弾後に主人公が消えて操作不能に見える件: `respawnAtCheckpoint()` で `player.sprite` を `setActive(true)/setVisible(true)/setAlpha(1)` で明示復帰し、復帰直後の接地状態スナップショットも更新。
+  - Stage終了時にResult遷移が失敗するとStage側が `stageFinished=true` のまま固まる件に備え、`finishRun()` にResult起動ウォッチドッグを追加。起動失敗時は `MainMenu` へフォールバック。
+  - Result画面でEsc遷移後に無反応化する件: `window` グローバル keydown フォールバックと `reload` 経路を撤去し、Resultシーン内タイマーによる遷移監視 + MainMenuフォールバックへ簡素化。
+  - Stage4終盤の紫chaserが床に阻まれる件: `s4-enemy-4` の `y` を `530 -> 500` に調整。
+- 検証: `npm run build` / `npm test` 成功。
+- Result入力不安定対策を追加。
+  - ResultSceneの入力を簡素化（シーン内キーのみ: Enter/NumpadEnter/Space/R/T/Esc）し、transition中に詰まった場合は800msでMainMenuへ強制フォールバック。
+  - 目的: T/Esc後にEnterや十字キーが順次効かなくなる遷移ロック状態を解消。
+- 敵弾被弾後にStageで主人公が消えたままになる対策を追加。
+  - StagePlayにResult遷移待ち監視を追加し、Resultが起動しないまま900ms経過した場合はMainMenuへ復帰。
+  - 目的: Backups=0被弾時のResult遷移失敗で stageFinished のまま入力停止するケースを回避。
+- 検証: `npm run build` / `npm test` 成功。
+- Console例外対応: `StageSelectScene.refreshTexts()` で破棄済みTextへ `setColor` が走るケースを修正。
+  - `create()` 冒頭と `SHUTDOWN` で `stageRows` をクリア。
+  - `refreshTexts()` で `!row.active || row.scene !== this` を除外。
+  - これにより `Frame2.updateUVs ... drawImage` 例外を回避。
+- 被弾後フリーズ対策をさらに強化。
+  - `stageFinishedAtMs` を導入し、Resultが起動していない状態で `stageFinished` が1.2秒以上続いたらMainMenuへ強制復帰。
+  - 既存の `awaitingResultTransition` 監視と組み合わせて、入力停止の取りこぼしを減らす。
+- 検証: `npm run build` / `npm test` 成功。
+- 敵弾被弾で操作不能化する不具合への最終対策として、`useBackupAndRespawn('glitch')` の `backups=0` 時動作を変更。
+  - 以前: `finishRun(false, 'glitch')`（Result遷移経路）
+  - 変更後: `activeCheckpoint = null` にして `respawnAtCheckpoint()`（ステージ開始地点リスポーン）
+- これで敵/敵弾被弾はバックアップ残量に関わらず「チェックポイント or スタート復帰」に統一され、被弾後に停止する経路を回避。
+- 検証: `npm run build` / `npm test` 成功。
+- 敵弾ヒット時の「主人公が消えて操作不能」不具合を原因解析。
+  - 原因: Projectileの `overlap/collider` コールバックが引数順を前提にしており、順序が入れ替わった場合に弾ではなくプレイヤー/敵を `destroy()` し得る実装だった。
+  - 対応: `StagePlayScene.createProjectileSystems()` を順序非依存化し、`ShotRuntime`/`EnemyRuntime` のMap所属判定で対象を解決してから処理するよう変更。
+  - 追加: `extractArcadeGameObject()` を導入し、コールバック引数が `Body` でも `gameObject` へ正規化して判定可能にした。
+- 検証: `npm run build` 成功、`npm test` 成功。
+- develop-web-game スキル要件の Playwright クライアント実行は、環境に `playwright` が無いため `ERR_MODULE_NOT_FOUND`（`Cannot find package 'playwright'`）で未実施。
+- ユーザー報告対応: 被弾時にチェックポイントが反映されず常にスタート復帰する不具合を修正。
+  - 原因: `useBackupAndRespawn('glitch')` の `backups=0` 分岐で `activeCheckpoint = null` を強制していた。
+  - 対応: 強制クリアを削除し、`respawnAtCheckpoint()` へ統一。結果として「チェックポイントがあればそこの少し上、なければスタート上空」へ復帰。
+- 検証: `npm run build` / `npm test` 成功。
+- ユーザー要望対応(水中操作): `GameInput` に `isUpHeld()` を追加し、`StagePlayScene.updateEnvironment()` で「水中かつ↑保持中」に上向き推進 (`WATER_SWIM_ASCENT_FORCE`) を加えるよう変更。
+  - 通常地形でのジャンプ仕様（単発ジャンプ）は `PlayerController.tryConsumeJump()` 側を変更せず維持。
+- 検証: `npm run build` / `npm test` 成功。
+- develop-web-game スキル要件の Playwright クライアント実行を再試行したが、引き続き `playwright` 未導入により `ERR_MODULE_NOT_FOUND` で実行不可。

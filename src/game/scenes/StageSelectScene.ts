@@ -23,6 +23,7 @@ export class StageSelectScene extends Phaser.Scene {
   create(): void {
     sessionStore.setFlow('stage_select')
     sessionStore.clearResult()
+    this.stageRows = []
 
     this.inputMap = new GameInput(this)
     this.leftKey = this.input.keyboard!.addKey('LEFT')
@@ -96,6 +97,7 @@ export class StageSelectScene extends Phaser.Scene {
     }))
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.stageRows = []
       clearRenderGameToText()
     })
   }
@@ -160,6 +162,9 @@ export class StageSelectScene extends Phaser.Scene {
     this.mirrorText.setText(`Mirror: ${snapshot.mirror ? 'ON' : 'OFF'}`)
 
     this.stageRows.forEach((row, index) => {
+      if (!row.active || row.scene !== this) {
+        return
+      }
       const stage = stages[index]
       const selected = index === this.selectedIndex
       row.setText(`${selected ? '▶' : ' '} Stage ${stage.index.toString().padStart(2, '0')}  ${stage.name}`)

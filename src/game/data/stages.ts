@@ -310,7 +310,7 @@ function makeStage4(): StageDefinition {
     { id: 's4-enemy-1', kind: 'crawler', x: 620, y: 590, patrolMinX: 530, patrolMaxX: 730, speed: 85 },
     { id: 's4-enemy-2', kind: 'turret', x: 1260, y: 475, speed: 0 },
     { id: 's4-enemy-3', kind: 'drone', x: 1700, y: 310, patrolMinX: 1510, patrolMaxX: 2100, speed: 84 },
-    { id: 's4-enemy-4', kind: 'chaser', x: 2450, y: 530, patrolMinX: 2360, patrolMaxX: 2700, speed: 86, minDifficulty: 'Standard' },
+    { id: 's4-enemy-4', kind: 'chaser', x: 2450, y: 500, patrolMinX: 2360, patrolMaxX: 2700, speed: 86, minDifficulty: 'Standard' },
     { id: 's4-enemy-5', kind: 'dasher', x: 2910, y: 630, patrolMinX: 2860, patrolMaxX: 3160, speed: 100, minDifficulty: 'Mean' },
   ]
 

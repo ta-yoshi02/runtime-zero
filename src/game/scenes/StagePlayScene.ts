@@ -42,6 +42,7 @@ const START_RESPAWN_DROP_Y = 64
 const CHECKPOINT_EDGE_PADDING = 2
 const CHECKPOINT_VERTICAL_RAISE_LIMIT = 40
 const CHECKPOINT_RESPAWN_CLEARANCE_Y = 12
+const WATER_SWIM_ASCENT_FORCE = 2500
 
 type PauseOption = 'Resume' | 'Restart Stage' | 'Exit to Stage Select'
 
@@ -67,6 +68,8 @@ interface EnemyRuntime {
 interface ShotRuntime {
   sprite: Phaser.Physics.Arcade.Image
   lifeMs: number
+  velocityX: number
+  velocityY: number
 }
 
 interface PortRuntime {
@@ -164,6 +167,9 @@ export class StagePlayScene extends Phaser.Scene {
 
   private stageStartTimeMs = 0
   private stageFinished = false
+  private stageFinishedAtMs = 0
+  private awaitingResultTransition = false
+  private resultTransitionStartedAtMs = 0
   private paused = false
 
   private patchState: PatchState = 'raw'
@@ -298,6 +304,33 @@ export class StagePlayScene extends Phaser.Scene {
 
   update(_: number, deltaMs: number): void {
     if (this.stageFinished) {
+      if (
+        !this.scene.manager.isActive(SCENE_KEYS.RESULT) &&
+        this.time.now - this.stageFinishedAtMs > 1200
+      ) {
+        this.awaitingResultTransition = false
+        this.stageFinished = false
+        sessionStore.setFlow('main_menu')
+        this.scene.start(SCENE_KEYS.MAIN_MENU)
+        return
+      }
+
+      if (this.awaitingResultTransition) {
+        const manager = this.scene.manager
+        const resultReady =
+          manager.isActive(SCENE_KEYS.RESULT) &&
+          manager.isVisible(SCENE_KEYS.RESULT) &&
+          !manager.isSleeping(SCENE_KEYS.RESULT)
+
+        if (resultReady) {
+          this.awaitingResultTransition = false
+        } else if (this.time.now - this.resultTransitionStartedAtMs > 900) {
+          this.awaitingResultTransition = false
+          this.stageFinished = false
+          sessionStore.setFlow('main_menu')
+          this.scene.start(SCENE_KEYS.MAIN_MENU)
+        }
+      }
       return
     }
 
@@ -375,6 +408,9 @@ export class StagePlayScene extends Phaser.Scene {
     this.activeCheckpoint = null
     this.nextPortUseAtMs = 0
     this.stageFinished = false
+    this.stageFinishedAtMs = 0
+    this.awaitingResultTransition = false
+    this.resultTransitionStartedAtMs = 0
     this.paused = false
   }
 
@@ -859,37 +895,76 @@ export class StagePlayScene extends Phaser.Scene {
     this.playerShotsGroup = this.physics.add.group({ allowGravity: false, immovable: true })
     this.enemyShotsGroup = this.physics.add.group({ allowGravity: false, immovable: true })
 
-    this.physics.add.overlap(this.playerShotsGroup, this.enemiesGroup, (shotObj, enemyObj) => {
-      const shot = shotObj as Phaser.Physics.Arcade.Image
-      const enemy = enemyObj as Phaser.Physics.Arcade.Sprite
+    this.physics.add.overlap(this.playerShotsGroup, this.enemiesGroup, (objA, objB) => {
+      const shot = this.resolveShotObject(objA, objB, this.playerShotRuntimes)
+      const enemy = this.resolveEnemyObject(objA, objB)
+      if (!shot || !enemy) {
+        return
+      }
+
       this.destroyShot(shot, this.playerShotRuntimes)
       this.destroyEnemy(enemy, 'projectile')
     })
 
-    this.physics.add.overlap(this.enemyShotsGroup, this.player.sprite, (shotObj) => {
-      const shot = shotObj as Phaser.Physics.Arcade.Image
+    this.physics.add.overlap(this.enemyShotsGroup, this.player.sprite, (objA, objB) => {
+      const shot = this.resolveShotObject(objA, objB, this.enemyShotRuntimes)
+      if (!shot) {
+        return
+      }
+
+      const sourceX = shot.x
       this.destroyShot(shot, this.enemyShotRuntimes)
-      this.onPlayerHit(shot.x)
+      this.onPlayerHit(sourceX)
     })
 
-    this.physics.add.collider(this.playerShotsGroup, this.staticPlatforms, (shotObj) => {
-      this.destroyShot(shotObj as Phaser.Physics.Arcade.Image, this.playerShotRuntimes)
+    this.physics.add.collider(this.playerShotsGroup, this.staticPlatforms, (objA, objB) => {
+      const shot = this.resolveShotObject(objA, objB, this.playerShotRuntimes)
+      if (!shot) {
+        return
+      }
+
+      this.destroyShot(shot, this.playerShotRuntimes)
     })
-    this.physics.add.collider(this.playerShotsGroup, this.dynamicPlatforms, (shotObj) => {
-      this.destroyShot(shotObj as Phaser.Physics.Arcade.Image, this.playerShotRuntimes)
+    this.physics.add.collider(this.playerShotsGroup, this.dynamicPlatforms, (objA, objB) => {
+      const shot = this.resolveShotObject(objA, objB, this.playerShotRuntimes)
+      if (!shot) {
+        return
+      }
+
+      this.destroyShot(shot, this.playerShotRuntimes)
     })
-    this.physics.add.collider(this.playerShotsGroup, this.collapseGroup, (shotObj) => {
-      this.destroyShot(shotObj as Phaser.Physics.Arcade.Image, this.playerShotRuntimes)
+    this.physics.add.collider(this.playerShotsGroup, this.collapseGroup, (objA, objB) => {
+      const shot = this.resolveShotObject(objA, objB, this.playerShotRuntimes)
+      if (!shot) {
+        return
+      }
+
+      this.destroyShot(shot, this.playerShotRuntimes)
     })
 
-    this.physics.add.collider(this.enemyShotsGroup, this.staticPlatforms, (shotObj) => {
-      this.destroyShot(shotObj as Phaser.Physics.Arcade.Image, this.enemyShotRuntimes)
+    this.physics.add.collider(this.enemyShotsGroup, this.staticPlatforms, (objA, objB) => {
+      const shot = this.resolveShotObject(objA, objB, this.enemyShotRuntimes)
+      if (!shot) {
+        return
+      }
+
+      this.destroyShot(shot, this.enemyShotRuntimes)
     })
-    this.physics.add.collider(this.enemyShotsGroup, this.dynamicPlatforms, (shotObj) => {
-      this.destroyShot(shotObj as Phaser.Physics.Arcade.Image, this.enemyShotRuntimes)
+    this.physics.add.collider(this.enemyShotsGroup, this.dynamicPlatforms, (objA, objB) => {
+      const shot = this.resolveShotObject(objA, objB, this.enemyShotRuntimes)
+      if (!shot) {
+        return
+      }
+
+      this.destroyShot(shot, this.enemyShotRuntimes)
     })
-    this.physics.add.collider(this.enemyShotsGroup, this.collapseGroup, (shotObj) => {
-      this.destroyShot(shotObj as Phaser.Physics.Arcade.Image, this.enemyShotRuntimes)
+    this.physics.add.collider(this.enemyShotsGroup, this.collapseGroup, (objA, objB) => {
+      const shot = this.resolveShotObject(objA, objB, this.enemyShotRuntimes)
+      if (!shot) {
+        return
+      }
+
+      this.destroyShot(shot, this.enemyShotRuntimes)
     })
   }
 
@@ -1041,6 +1116,7 @@ export class StagePlayScene extends Phaser.Scene {
     const body = this.player.getBody()
     const dt = deltaMs / 1000
 
+    let inWater = false
     let gravityScale = 1
     let forceX = 0
     let forceY = 0
@@ -1061,12 +1137,17 @@ export class StagePlayScene extends Phaser.Scene {
 
     this.waterZones.forEach((zoneRuntime) => {
       if (Phaser.Geom.Rectangle.Contains(zoneRuntime.rect, player.x, player.y)) {
+        inWater = true
         forceX += zoneRuntime.source.forceX
         forceY += zoneRuntime.source.forceY
         gravityScale *= 0.36
         waterDrag = waterDrag === null ? zoneRuntime.source.drag : Math.min(waterDrag, zoneRuntime.source.drag)
       }
     })
+
+    if (inWater && this.inputMap.isUpHeld()) {
+      forceY -= WATER_SWIM_ASCENT_FORCE
+    }
 
     this.rotatorZones.forEach((zoneRuntime) => {
       if (!Phaser.Geom.Rectangle.Contains(zoneRuntime.rect, player.x, player.y)) {
@@ -1164,18 +1245,25 @@ export class StagePlayScene extends Phaser.Scene {
     const direction = this.player.getFacingDirection()
     const spawnX = this.player.sprite.x + direction * 20
     const spawnY = this.player.sprite.y - 8
+    const shotSpeed = Number.isFinite(this.activeTuning.shotSpeed)
+      ? Math.max(200, Math.abs(this.activeTuning.shotSpeed))
+      : 610
+    const velocityX = direction * shotSpeed
+    const velocityY = 0
 
     const shot = this.physics.add
       .image(spawnX, spawnY, 'player-shot')
       .setDepth(8)
 
     ;(shot.body as Phaser.Physics.Arcade.Body | null)?.setAllowGravity(false)
-    shot.setVelocity(direction * this.activeTuning.shotSpeed, 0)
+    shot.setVelocity(velocityX, velocityY)
 
     this.playerShotsGroup.add(shot)
     this.playerShotRuntimes.set(shot, {
       sprite: shot,
       lifeMs: 1100,
+      velocityX,
+      velocityY,
     })
 
     this.fireCooldownMs = this.activeTuning.fireCooldownMs
@@ -1184,6 +1272,7 @@ export class StagePlayScene extends Phaser.Scene {
 
   private updateShots(deltaMs: number): void {
     this.playerShotRuntimes.forEach((runtime, sprite) => {
+      this.enforceShotVelocity(runtime)
       runtime.lifeMs -= deltaMs
       if (runtime.lifeMs <= 0 || !runtime.sprite.active) {
         this.destroyShot(runtime.sprite, this.playerShotRuntimes)
@@ -1192,6 +1281,7 @@ export class StagePlayScene extends Phaser.Scene {
     })
 
     this.enemyShotRuntimes.forEach((runtime, sprite) => {
+      this.enforceShotVelocity(runtime)
       runtime.lifeMs -= deltaMs
       if (runtime.lifeMs <= 0 || !runtime.sprite.active) {
         this.destroyShot(runtime.sprite, this.enemyShotRuntimes)
@@ -1333,12 +1423,16 @@ export class StagePlayScene extends Phaser.Scene {
       .image(runtime.sprite.x, runtime.sprite.y - 6, 'enemy-shot')
       .setDepth(8)
     ;(shot.body as Phaser.Physics.Arcade.Body | null)?.setAllowGravity(false)
-    shot.setVelocity(dx * inv * speed, dy * inv * speed)
+    const velocityX = dx * inv * speed
+    const velocityY = dy * inv * speed
+    shot.setVelocity(velocityX, velocityY)
 
     this.enemyShotsGroup.add(shot)
     this.enemyShotRuntimes.set(shot, {
       sprite: shot,
       lifeMs: 1400,
+      velocityX,
+      velocityY,
     })
 
     runtime.shotCooldownMs =
@@ -1424,6 +1518,13 @@ export class StagePlayScene extends Phaser.Scene {
       return
     }
 
+    // Combat deaths should never soft-lock the run when backups are empty.
+    // Respawn at checkpoint if available, otherwise fall back to stage-start.
+    if (reason === 'glitch') {
+      this.respawnAtCheckpoint()
+      return
+    }
+
     this.finishRun(false, reason)
   }
 
@@ -1435,12 +1536,34 @@ export class StagePlayScene extends Phaser.Scene {
         }
       : this.getStartRespawnPoint()
 
+    this.stageFinished = false
+    this.awaitingResultTransition = false
+    this.resultTransitionStartedAtMs = 0
+    this.stageFinishedAtMs = 0
+    this.paused = false
+    this.pauseOverlay.setVisible(false)
+    this.physics.world.resume()
+
     this.player.setSpawnPosition(spawn)
+    this.player.clearControlLock()
+    this.player.sprite.setActive(true).setVisible(true).setAlpha(1).setDepth(2)
+    this.player.sprite.setCollideWorldBounds(true)
+    const body = this.player.getBody()
+    body.enable = true
+    body.moves = true
+    body.setAllowGravity(true)
+    body.setVelocity(0, 0)
+
+    this.snapCameraToPosition(spawn)
     this.patchState = 'raw'
     this.sudoTimerMs = 0
     this.invulnTimerMs = CHECKPOINT_RESPAWN_INVULN_MS
     this.player.lockControls(RAW_RESPAWN_CONTROL_LOCK_MS)
+    this.previousGrounded = this.player.isGrounded()
+    this.previousVerticalVelocity = body.velocity.y
     this.cameraFlash(0xffd6d6, 0.25)
+    this.refreshPatchVisual()
+    this.refreshHud()
   }
 
   private getStartRespawnPoint(): { x: number; y: number } {
@@ -1606,6 +1729,15 @@ export class StagePlayScene extends Phaser.Scene {
     camera.followOffset.x = Phaser.Math.Linear(camera.followOffset.x, lookAhead, 0.14)
   }
 
+  private snapCameraToPosition(position: { x: number; y: number }): void {
+    const camera = this.cameras.main
+    const maxScrollX = Math.max(0, this.stage.size.width - camera.width)
+    const maxScrollY = Math.max(0, this.stage.size.height - camera.height)
+
+    camera.scrollX = Phaser.Math.Clamp(position.x - camera.width * 0.5, 0, maxScrollX)
+    camera.scrollY = Phaser.Math.Clamp(position.y - camera.height * 0.5, 0, maxScrollY)
+  }
+
   private updatePlayerAuras(deltaMs: number): void {
     const player = this.player.sprite
 
@@ -1717,6 +1849,76 @@ export class StagePlayScene extends Phaser.Scene {
     shot.destroy()
   }
 
+  private enforceShotVelocity(runtime: ShotRuntime): void {
+    const body = runtime.sprite.body as Phaser.Physics.Arcade.Body | null
+    if (!body || !body.enable || !runtime.sprite.active) {
+      return
+    }
+
+    body.setAllowGravity(false)
+    body.setVelocity(runtime.velocityX, runtime.velocityY)
+  }
+
+  private resolveShotObject(
+    objA: unknown,
+    objB: unknown,
+    registry: Map<Phaser.Physics.Arcade.Image, ShotRuntime>,
+  ): Phaser.Physics.Arcade.Image | null {
+    const shotA = this.extractArcadeGameObject(objA) as Phaser.Physics.Arcade.Image | null
+    if (!shotA) {
+      const shotB = this.extractArcadeGameObject(objB) as Phaser.Physics.Arcade.Image | null
+      return shotB && registry.has(shotB) ? shotB : null
+    }
+
+    if (registry.has(shotA)) {
+      return shotA
+    }
+
+    const shotB = this.extractArcadeGameObject(objB) as Phaser.Physics.Arcade.Image | null
+    if (shotB && registry.has(shotB)) {
+      return shotB
+    }
+
+    return null
+  }
+
+  private resolveEnemyObject(
+    objA: unknown,
+    objB: unknown,
+  ): Phaser.Physics.Arcade.Sprite | null {
+    const enemyA = this.extractArcadeGameObject(objA) as Phaser.Physics.Arcade.Sprite | null
+    if (enemyA && this.enemyRuntimes.has(enemyA)) {
+      return enemyA
+    }
+
+    const enemyB = this.extractArcadeGameObject(objB) as Phaser.Physics.Arcade.Sprite | null
+    if (enemyB && this.enemyRuntimes.has(enemyB)) {
+      return enemyB
+    }
+
+    return null
+  }
+
+  private extractArcadeGameObject(candidate: unknown): Phaser.GameObjects.GameObject | null {
+    if (!candidate || typeof candidate !== 'object') {
+      return null
+    }
+
+    const direct = candidate as Phaser.GameObjects.GameObject
+    if ('scene' in direct && 'active' in direct) {
+      return direct
+    }
+
+    const withGameObject = candidate as {
+      gameObject?: Phaser.GameObjects.GameObject | null
+    }
+    if (withGameObject.gameObject) {
+      return withGameObject.gameObject
+    }
+
+    return null
+  }
+
   private transformPatrolRange(enemy: StageEnemySpawn): { min: number; max: number } {
     const min = enemy.patrolMinX ?? enemy.x - 140
     const max = enemy.patrolMaxX ?? enemy.x + 140
@@ -1761,6 +1963,7 @@ export class StagePlayScene extends Phaser.Scene {
     }
 
     this.stageFinished = true
+    this.stageFinishedAtMs = this.time.now
     runtimeAudio.stopStageLoop()
 
     const snapshot = sessionStore.snapshot
@@ -1784,7 +1987,17 @@ export class StagePlayScene extends Phaser.Scene {
     sessionStore.setResult(runResult)
     sessionStore.setFlow('result')
     runtimeAudio.play(success ? 'goal' : 'hit')
-    this.scene.start(SCENE_KEYS.RESULT)
+    this.awaitingResultTransition = true
+    this.resultTransitionStartedAtMs = this.time.now
+    try {
+      this.scene.start(SCENE_KEYS.RESULT)
+    } catch {
+      this.stageFinished = false
+      this.awaitingResultTransition = false
+      sessionStore.setFlow('main_menu')
+      this.scene.start(SCENE_KEYS.MAIN_MENU)
+      return
+    }
   }
 
   private computeRank(success: boolean, elapsedMs: number): Rank {

@@ -1,5 +1,4 @@
 import Phaser from 'phaser'
-import { setBootIntent } from '../core/bootIntent'
 import { clearRenderGameToText, setRenderGameToText } from '../core/browserHooks'
 import { SCENE_KEYS } from '../core/sceneKeys'
 import { sessionStore } from '../core/sessionStore'
@@ -10,12 +9,13 @@ export class ResultScene extends Phaser.Scene {
   private inputMap!: GameInput
   private menuKey!: Phaser.Input.Keyboard.Key
   private enterKey!: Phaser.Input.Keyboard.Key
+  private numpadEnterKey!: Phaser.Input.Keyboard.Key
+  private spaceKey!: Phaser.Input.Keyboard.Key
   private retryKey!: Phaser.Input.Keyboard.Key
   private escKey!: Phaser.Input.Keyboard.Key
-  private keydownHandler: ((event: KeyboardEvent) => void) | null = null
-  private windowKeydownHandler: ((event: KeyboardEvent) => void) | null = null
   private transitioning = false
-  private transitionWatchdogTimer: number | null = null
+  private transitionStartedAtMs = 0
+  private transitionTargetScene: string | null = null
 
   constructor() {
     super(SCENE_KEYS.RESULT)
@@ -36,8 +36,12 @@ export class ResultScene extends Phaser.Scene {
     this.inputMap = new GameInput(this)
     this.menuKey = this.input.keyboard!.addKey('T')
     this.enterKey = this.input.keyboard!.addKey('ENTER')
+    this.numpadEnterKey = this.input.keyboard!.addKey('NUMPAD_ENTER')
+    this.spaceKey = this.input.keyboard!.addKey('SPACE')
     this.retryKey = this.input.keyboard!.addKey('R')
     this.escKey = this.input.keyboard!.addKey('ESC')
+    this.transitionStartedAtMs = 0
+    this.transitionTargetScene = null
 
     const result = sessionStore.snapshot.result
 
@@ -101,41 +105,39 @@ export class ResultScene extends Phaser.Scene {
       prompt: 'Enter stage select / R retry / T main menu',
     }))
 
-    this.keydownHandler = (event: KeyboardEvent) => {
-      this.handleRawKeydown(event)
-    }
-    keyboard?.on('keydown', this.keydownHandler)
-
-    this.windowKeydownHandler = (event: KeyboardEvent) => {
-      this.handleRawKeydown(event)
-    }
-    window.addEventListener('keydown', this.windowKeydownHandler, { passive: false })
-
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      if (this.keydownHandler) {
-        keyboard?.off('keydown', this.keydownHandler)
-      }
-      this.keydownHandler = null
-      if (this.windowKeydownHandler) {
-        window.removeEventListener('keydown', this.windowKeydownHandler)
-      }
-      this.windowKeydownHandler = null
-      if (!this.transitioning && this.transitionWatchdogTimer !== null) {
-        window.clearTimeout(this.transitionWatchdogTimer)
-      }
-      if (!this.transitioning) {
-        this.transitionWatchdogTimer = null
-      }
       clearRenderGameToText()
     })
   }
 
   update(): void {
     if (this.transitioning) {
+      const target = this.transitionTargetScene
+      const targetReady =
+        target !== null &&
+        this.scene.manager.isActive(target) &&
+        this.scene.manager.isVisible(target) &&
+        !this.scene.manager.isSleeping(target)
+
+      if (targetReady) {
+        return
+      }
+
+      if (this.time.now - this.transitionStartedAtMs > 800) {
+        this.transitioning = false
+        this.transitionTargetScene = null
+        sessionStore.setFlow('main_menu')
+        this.scene.start(SCENE_KEYS.MAIN_MENU)
+      }
       return
     }
 
-    if (this.inputMap.consumeConfirmPressed() || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+    if (
+      this.inputMap.consumeConfirmPressed() ||
+      Phaser.Input.Keyboard.JustDown(this.enterKey) ||
+      Phaser.Input.Keyboard.JustDown(this.numpadEnterKey) ||
+      Phaser.Input.Keyboard.JustDown(this.spaceKey)
+    ) {
       this.goStageSelect()
       return
     }
@@ -150,32 +152,6 @@ export class ResultScene extends Phaser.Scene {
       Phaser.Input.Keyboard.JustDown(this.menuKey) ||
       Phaser.Input.Keyboard.JustDown(this.escKey)
     ) {
-      this.goMainMenu()
-    }
-  }
-
-  private handleRawKeydown(event: KeyboardEvent): void {
-    if (this.transitioning) {
-      return
-    }
-
-    const code = event.code
-    const key = event.key.toLowerCase()
-
-    if (code === 'Enter' || code === 'NumpadEnter' || code === 'Space' || key === 'enter' || key === ' ') {
-      event.preventDefault()
-      this.goStageSelect()
-      return
-    }
-
-    if (code === 'KeyR' || key === 'r') {
-      event.preventDefault()
-      this.goRetry()
-      return
-    }
-
-    if (code === 'KeyT' || code === 'Escape' || key === 't' || key === 'escape') {
-      event.preventDefault()
       this.goMainMenu()
     }
   }
@@ -198,39 +174,17 @@ export class ResultScene extends Phaser.Scene {
     }
 
     this.transitioning = true
+    this.transitionStartedAtMs = this.time.now
+    this.transitionTargetScene = targetScene
     sessionStore.setFlow(nextFlow)
+
     try {
       this.scene.start(targetScene)
     } catch {
-      this.reloadToTargetScene(targetScene)
-      return
+      this.transitioning = false
+      this.transitionTargetScene = null
+      sessionStore.setFlow('main_menu')
+      this.scene.start(SCENE_KEYS.MAIN_MENU)
     }
-
-    // If target scene fails to boot for any reason, recover to Title.
-    this.transitionWatchdogTimer = window.setTimeout(() => {
-      const manager = this.scene.manager
-      const targetReady =
-        manager.isActive(targetScene) &&
-        manager.isVisible(targetScene) &&
-        !manager.isSleeping(targetScene)
-      if (targetReady) {
-        this.transitionWatchdogTimer = null
-        return
-      }
-
-      this.reloadToTargetScene(targetScene)
-      this.transitionWatchdogTimer = null
-    }, 300)
-  }
-
-  private reloadToTargetScene(targetScene: string): void {
-    const snapshot = sessionStore.snapshot
-    setBootIntent({
-      targetScene,
-      selectedStageId: snapshot.selectedStageId,
-      difficulty: snapshot.difficulty,
-      mirror: snapshot.mirror,
-    })
-    window.location.reload()
   }
 }

@@ -112,6 +112,11 @@ export class GameInput {
     return this.anyDown(this.downKeys) || Boolean(this.padSnapshot?.down)
   }
 
+  isUpHeld(): boolean {
+    this.refreshPadState()
+    return this.anyDown(this.upKeys) || Boolean(this.padSnapshot?.up)
+  }
+
   isJumpHeld(): boolean {
     this.refreshPadState()
     return this.anyDown(this.jumpKeys) || Boolean(this.padSnapshot?.jump)
