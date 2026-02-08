@@ -1,5 +1,7 @@
 # Runtime: Zero
 
+※このゲームは GPT5.3 で作成したお遊びプロトタイプです。
+
 `Runtime: Zero` is an original 2D side-scrolling action platformer prototype built with **Phaser 3 + TypeScript + Vite**.
 
 The current state focuses on core gameplay and architecture:

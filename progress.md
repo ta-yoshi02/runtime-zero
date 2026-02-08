@@ -45,3 +45,31 @@ Original prompt: Vite + Phaser で 2D横スクロールアクション「Runtime
 - 公開不具合調査: `https://ta-yoshi02.github.io/runtime-zero/` は `dist` ではなくリポジトリ直下 `index.html` と `src/main.ts` を配信していることを確認（GitHub Pages側の `pages-build-deployment`/Jekyll 経路）。
 - `gh run` 調査で `.github/workflows/pages.yml` の `CI and Pages` は `actions/configure-pages@v5` で「Pages site not found」で失敗しており、その結果として `pages-build-deployment` が代替実行される状態を確認。
 - 対応: `.github/workflows/pages.yml` の `actions/configure-pages@v5` に `with: enablement: true` を追加し、Pages未初期化時でも workflow でサイト初期化して `dist` デプロイ経路へ復帰できるようにした。
+
+## 2026-02-08
+- ユーザー要望対応: `README.md` 冒頭に「GPT5.3で作成したお遊びプロトタイプ」である旨を追記。
+- 奈落落下判定の不具合を修正: `StagePlayScene.setupWorld()` で `physics.world.setBoundsCollision(true, true, true, false)` を設定し、ワールド下端でプレイヤーが止まらないようにした（`y > stage.height + 100` の `null_pointer` 判定へ到達可能化）。
+- 検証: `npm run build` 成功、`npm test` 成功。
+- develop-web-game スキルの Playwright クライアント実行を試行したが、環境に `playwright` パッケージが無く `ERR_MODULE_NOT_FOUND` で実行不可。
+- TODO: Playwright を利用可能にした上で、Title -> Stage Select -> Stage1 の実プレイループで奈落落下時の `null_pointer` 結果を画面/`render_game_to_text` で確認する。
+- ユーザー要望対応(奈落復帰仕様): `StagePlayScene.handleNullPointerFall()` をバックアップ消費/ゲームオーバー経路から切り離し、奈落落下時は常に復帰処理へ変更。
+- ユーザー要望対応(リスキル防止): 復帰座標をチェックポイント中心固定から「近傍の静的平台上への安全スナップ」に変更。
+  - `staticPlatformRects` を保持して、候補Xを左右に探索し、床上(`platform.y - 8`)に再配置。
+  - チェックポイントが空中や穴上でも、近くの床に補正して即落下を回避。
+  - チェックポイントで安全点が見つからない場合は、ステージ開始地点の安全点へフォールバック。
+- 検証: `npm run build` 成功、`npm test` 成功。
+- ユーザー指示に合わせて復帰仕様を再調整。
+  - チェックポイント未到達時: スタート地点そのものではなく `START_RESPAWN_DROP_Y` 分だけ上から復帰して落下させるよう変更。
+  - チェックポイント到達後: 復帰座標をチェックポイント中心固定へ戻し、代わりにチェックポイント生成時に静的平台へ自動スナップして「必ず床上」に配置するよう変更。
+  - これにより、セーブ地点の床抜け復帰をデータ個別修正なしで回避。
+- 検証: `npm run build` 成功、`npm test` 成功。
+- UI不具合修正: Pauseオーバーレイ配下オブジェクトのdepthをローカル順に戻し、コンテナ自体を `setDepth(100)` に変更。Pause中にゲームオブジェクトが上に描画される問題を解消。
+- チェックポイント不具合修正: プラットフォーム補正時のY基準を `platform.y - checkpoint.height` に変更し、チェックポイントを床上に配置。
+- 復帰位置補正: チェックポイント復帰時のYを `checkpoint.y + checkpoint.height - 8` に変更し、床上復帰と整合。
+- 検証: `npm run build` / `npm test` 成功。
+- 追加修正: チェックポイント復帰Yを固定オフセット計算から、プレイヤーの実ボディ寸法(`displayHeight/origin/body.offset/body.height`)ベース計算へ変更。
+  - `getPlayerSpawnYFromGround(groundY)` を追加し、床面Yから「足元が床上1px」に来るスプライトYを算出。
+  - これにより、チェックポイント直下への埋まり復帰（リスキル）を解消。
+- 検証: `npm run build` / `npm test` 成功。
+- 追加調整: チェックポイント復帰位置をさらに上げるため `CHECKPOINT_RESPAWN_CLEARANCE_Y=12` を導入し、地面算出位置から上方向にオフセットして復帰させるよう変更。
+- 検証: `npm run build` / `npm test` 成功。

@@ -38,6 +38,10 @@ const CHECKPOINT_RESPAWN_INVULN_MS = 1400
 const RAW_RESPAWN_CONTROL_LOCK_MS = 320
 const COLLAPSING_FLASH_MS = 260
 const SLOW_MO_GEM_MS = 90
+const START_RESPAWN_DROP_Y = 64
+const CHECKPOINT_EDGE_PADDING = 2
+const CHECKPOINT_VERTICAL_RAISE_LIMIT = 40
+const CHECKPOINT_RESPAWN_CLEARANCE_Y = 12
 
 type PauseOption = 'Resume' | 'Restart Stage' | 'Exit to Stage Select'
 
@@ -128,6 +132,7 @@ export class StagePlayScene extends Phaser.Scene {
   private staticPlatforms!: Phaser.Physics.Arcade.StaticGroup
   private dynamicPlatforms!: Phaser.Physics.Arcade.Group
   private collapseGroup!: Phaser.Physics.Arcade.Group
+  private staticPlatformRects: Rect[] = []
 
   private goalZone!: Phaser.GameObjects.Zone
   private transformedGoal!: Rect
@@ -375,6 +380,7 @@ export class StagePlayScene extends Phaser.Scene {
 
   private setupWorld(): void {
     this.physics.world.setBounds(0, 0, this.stage.size.width, this.stage.size.height)
+    this.physics.world.setBoundsCollision(true, true, true, false)
     this.cameras.main.setBounds(0, 0, this.stage.size.width, this.stage.size.height)
   }
 
@@ -406,6 +412,7 @@ export class StagePlayScene extends Phaser.Scene {
   }
 
   private createPlatformLayers(): void {
+    this.staticPlatformRects = []
     this.staticPlatforms = this.physics.add.staticGroup()
     this.dynamicPlatforms = this.physics.add.group({
       allowGravity: false,
@@ -418,6 +425,7 @@ export class StagePlayScene extends Phaser.Scene {
 
     this.stage.platforms.forEach((platformRect) => {
       const rect = this.transformRect(platformRect)
+      this.staticPlatformRects.push(rect)
       const platform = this.staticPlatforms.create(rect.x, rect.y, 'platform-block')
       platform.setOrigin(0, 0)
       platform.setDisplaySize(rect.width, rect.height)
@@ -624,12 +632,13 @@ export class StagePlayScene extends Phaser.Scene {
     this.checkpointsGroup = this.physics.add.staticGroup()
 
     this.stage.checkpoints.forEach((checkpoint) => {
-      const rect = this.transformRect({
+      const desiredRect = this.transformRect({
         x: checkpoint.x,
         y: checkpoint.y,
         width: checkpoint.width,
         height: checkpoint.height,
       })
+      const rect = this.alignCheckpointRectToPlatform(desiredRect)
 
       const sprite = this.checkpointsGroup.create(rect.x, rect.y, 'checkpoint-node')
       sprite.setOrigin(0, 0)
@@ -888,13 +897,13 @@ export class StagePlayScene extends Phaser.Scene {
     const dim = this.add
       .rectangle(480, 270, 960, 540, 0x02060a, 0.72)
       .setScrollFactor(0)
-      .setDepth(30)
+      .setDepth(0)
 
     const panel = this.add
       .rectangle(480, 270, 480, 300, 0x15324a, 0.96)
       .setStrokeStyle(3, 0x74c7ff, 1)
       .setScrollFactor(0)
-      .setDepth(31)
+      .setDepth(1)
 
     const title = this.add
       .text(480, 168, 'Paused', {
@@ -904,7 +913,7 @@ export class StagePlayScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
-      .setDepth(32)
+      .setDepth(2)
 
     this.pauseOptionTexts = this.pauseOptions.map((option, index) =>
       this.add
@@ -915,7 +924,7 @@ export class StagePlayScene extends Phaser.Scene {
         })
         .setOrigin(0.5)
         .setScrollFactor(0)
-        .setDepth(32),
+        .setDepth(2),
     )
 
     const helper = this.add
@@ -926,9 +935,10 @@ export class StagePlayScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
-      .setDepth(32)
+      .setDepth(2)
 
     this.pauseOverlay = this.add.container(0, 0, [dim, panel, title, ...this.pauseOptionTexts, helper])
+    this.pauseOverlay.setDepth(100)
     this.pauseOverlay.setVisible(false)
 
     this.refreshPauseMenu()
@@ -1403,7 +1413,7 @@ export class StagePlayScene extends Phaser.Scene {
   }
 
   private handleNullPointerFall(): void {
-    this.useBackupAndRespawn('null_pointer')
+    this.respawnAtCheckpoint()
   }
 
   private useBackupAndRespawn(reason: StageFailReason): void {
@@ -1418,13 +1428,12 @@ export class StagePlayScene extends Phaser.Scene {
   }
 
   private respawnAtCheckpoint(): void {
-    const spawn =
-      this.activeCheckpoint
-        ? {
-            x: this.activeCheckpoint.x + this.activeCheckpoint.width * 0.5,
-            y: this.activeCheckpoint.y - 8,
-          }
-        : this.transformPoint(this.stage.spawn)
+    const spawn = this.activeCheckpoint
+      ? {
+          x: this.activeCheckpoint.x + this.activeCheckpoint.width * 0.5,
+          y: this.getPlayerSpawnYFromGround(this.activeCheckpoint.y + this.activeCheckpoint.height),
+        }
+      : this.getStartRespawnPoint()
 
     this.player.setSpawnPosition(spawn)
     this.patchState = 'raw'
@@ -1432,6 +1441,77 @@ export class StagePlayScene extends Phaser.Scene {
     this.invulnTimerMs = CHECKPOINT_RESPAWN_INVULN_MS
     this.player.lockControls(RAW_RESPAWN_CONTROL_LOCK_MS)
     this.cameraFlash(0xffd6d6, 0.25)
+  }
+
+  private getStartRespawnPoint(): { x: number; y: number } {
+    const stageSpawn = this.transformPoint(this.stage.spawn)
+    return {
+      x: stageSpawn.x,
+      y: Math.max(48, stageSpawn.y - START_RESPAWN_DROP_Y),
+    }
+  }
+
+  private getPlayerSpawnYFromGround(groundY: number): number {
+    const sprite = this.player.sprite
+    const body = this.player.getBody()
+    const groundedY = groundY + sprite.displayHeight * sprite.originY - body.offset.y - body.height - 1
+    return Math.max(48, groundedY - CHECKPOINT_RESPAWN_CLEARANCE_Y)
+  }
+
+  private alignCheckpointRectToPlatform(checkpointRect: Rect): Rect {
+    const supportPlatform = this.findCheckpointSupportPlatform(checkpointRect)
+    if (!supportPlatform) {
+      return checkpointRect
+    }
+
+    const halfWidth = checkpointRect.width * 0.5
+    const minCenterX = supportPlatform.x + halfWidth + CHECKPOINT_EDGE_PADDING
+    const maxCenterX = supportPlatform.x + supportPlatform.width - halfWidth - CHECKPOINT_EDGE_PADDING
+    const centerX = Phaser.Math.Clamp(checkpointRect.x + halfWidth, minCenterX, maxCenterX)
+
+    return {
+      ...checkpointRect,
+      x: centerX - halfWidth,
+      y: supportPlatform.y - checkpointRect.height,
+    }
+  }
+
+  private findCheckpointSupportPlatform(checkpointRect: Rect): Rect | null {
+    const halfWidth = checkpointRect.width * 0.5
+    const centerX = checkpointRect.x + halfWidth
+    let bestPlatform: Rect | null = null
+    let bestScore = Number.POSITIVE_INFINITY
+
+    for (const platform of this.staticPlatformRects) {
+      if (platform.width < checkpointRect.width + CHECKPOINT_EDGE_PADDING * 2) {
+        continue
+      }
+
+      const minCenterX = platform.x + halfWidth + CHECKPOINT_EDGE_PADDING
+      const maxCenterX = platform.x + platform.width - halfWidth - CHECKPOINT_EDGE_PADDING
+      if (minCenterX > maxCenterX) {
+        continue
+      }
+
+      const horizontalDistance =
+        centerX < minCenterX
+          ? minCenterX - centerX
+          : centerX > maxCenterX
+            ? centerX - maxCenterX
+            : 0
+      const verticalDistance = Math.abs(platform.y - checkpointRect.y)
+      const raisePenalty = platform.y < checkpointRect.y - CHECKPOINT_VERTICAL_RAISE_LIMIT ? 2500 : 0
+      const score = horizontalDistance * 3 + verticalDistance + raisePenalty
+
+      if (score >= bestScore) {
+        continue
+      }
+
+      bestScore = score
+      bestPlatform = platform
+    }
+
+    return bestPlatform
   }
 
   private collectCycle(sprite: Phaser.Physics.Arcade.Image): void {
